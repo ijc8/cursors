@@ -4,7 +4,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import time
 
-shape = (8, 8)
+shape = (8, 16)
 # MxNx2; first MxN is sequencer layer, second is 'active'/'playing field' layer.
 # This describes state, *not* appearence.
 grid = np.zeros(shape + (2,), dtype=np.int)
@@ -12,7 +12,7 @@ grid = np.zeros(shape + (2,), dtype=np.int)
 # The first three things are fixed-ish, the last changes all the time.
 # In particular, the last is a float which is rounded down for rendering and checking.
 # TODO class
-cursors = [[0, 8, 1, 0]]
+cursors = [[0, 8, 3, 0]]
 
 CURSOR_COLOR = [1, 0, 0]
 
@@ -22,7 +22,7 @@ class Effector:
         self.function = function
         self.color = color
 
-def reverse(cursor):
+def reverse(cursor, _):
     if cursor[2] > 0:
         gap = cursor[3] - np.floor(cursor[3])
         cursor[3] = np.floor(cursor[3]) + (1 - gap)
@@ -31,8 +31,14 @@ def reverse(cursor):
         cursor[3] = np.ceil(cursor[3]) - (1 - gap)
     cursor[2] *= -1
 
-def split(cursor):
-    print('TODO')
+def split(cursor, pos):
+    if pos[0] == cursor[0]:
+        return  # can't split at the top. (think about it)
+    global cursors
+    cursors.remove(cursor)
+    top = [cursor[0], pos[0] - cursor[0], cursor[2], cursor[3]]
+    bottom = [pos[0], cursor[0] + cursor[1] - pos[0], cursor[2], cursor[3]]
+    cursors += [top, bottom]
 
 effectors = [Effector('reverse', reverse, (0, 1, 0)),
              Effector('split', split, (0, 0, 1))]
@@ -94,7 +100,7 @@ def update():
     global last
     now = time.time()
     dt = now - last
-    for cursor in cursors:
+    for cursor in cursors[:]:
         old_pos = int(cursor[3])
         cursor[3] += cursor[2] * dt
         cursor[3] %= grid.shape[1]
@@ -104,13 +110,13 @@ def update():
             hits = grid[start:start + height, new_pos, 0].nonzero()[0]
             for hit in hits:
                 effector = effectors[grid[start + hit, new_pos, 0] - 1]
-                print(f'we hit {effector.name} at ({start + hit}, {new_pos})!')
-                effector.function(cursor)
+                pos = (start + hit, new_pos)
+                print(f'we hit {effector.name} at {pos}!')
+                effector.function(cursor, pos)
     last = now
 
 while True:
     g = render(grid, cursors)
     im.set_data(g)
-    im.autoscale()
     update()
     plt.pause(0.001)
