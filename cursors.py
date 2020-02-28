@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import time
+import copy
 
 shape = (8, 16)
 # MxNx2; first MxN is sequencer layer, second is 'active'/'playing field' layer.
@@ -17,7 +18,19 @@ grid = np.zeros(shape + (2,), dtype=np.int)
 # equivalently take average of start, start + height, compute color. okay yeah let's do that.
 # another idea: separate merge and destroy effectors. destroy good for reducing complexity in a more serious way.
 # alternatively, mute/unmute effector, allowing for same thing in a less permanent way.
-cursors = [[0, 8, 3, 0, 1]]
+class Cursor:
+    def __init__(self, start, height, speed, pos, merge_direction):
+        self.start = start
+        self.height = height
+        self.speed = speed
+        self.pos = pos
+        self.merge_direction = merge_direction
+
+    def __repr__(self):
+        return f"Cursor(start={self.start}, height={self.height}, speed={self.speed}, pos={self.pos}, merge_direction={self.merge_direction})"
+
+proto_cursor = Cursor(0, 8, 3, 0, 1)
+cursors = [copy.copy(proto_cursor)]
 
 
 class Effector:
@@ -28,46 +41,45 @@ class Effector:
 
 
 def reverse(cursor, _):
-    if cursor[2] > 0:
-        gap = cursor[3] - np.floor(cursor[3])
-        cursor[3] = np.floor(cursor[3]) + (1 - gap)
+    if cursor.speed > 0:
+        gap = cursor.pos - np.floor(cursor.pos)
+        cursor.pos = np.floor(cursor.pos) + (1 - gap)
     else:
-        gap = np.ceil(cursor[3]) - cursor[3]
-        cursor[3] = np.ceil(cursor[3]) - (1 - gap)
-    cursor[2] *= -1
+        gap = np.ceil(cursor.pos) - cursor.pos
+        cursor.pos = np.ceil(cursor.pos) - (1 - gap)
+    cursor.speed *= -1
 
 
 def split(cursor, pos):
-    if pos[0] == cursor[0]:
+    if pos[0] == cursor.start:
         return  # can't split at the top. (think about it)
     global cursors
     ind = cursors.index(cursor)
-    top = [cursor[0], pos[0] - cursor[0], cursor[2], cursor[3], 1]
-    bottom = [pos[0], cursor[0] + cursor[1] - pos[0], cursor[2], cursor[3], -1]
+    top = Cursor(cursor.start, pos[0] - cursor.start, cursor.speed, cursor.pos, 1)
+    bottom = Cursor(pos[0], cursor.start + cursor.height - pos[0], cursor.speed, cursor.pos, -1)
     cursors[ind] = top
     cursors.insert(ind + 1, bottom)
 
 
 def merge(cursor, _):
     ind = cursors.index(cursor)
-    merge_direction = cursor[4]
     print("old", cursors)
-    print("merge", ind, merge_direction)
-    if merge_direction == -1:
+    print("merge", ind, cursor.merge_direction)
+    if cursor.merge_direction == -1:
         if ind > 0:
             print("with", ind - 1)
-            cursors[ind - 1][1] += cursor[1]
+            cursors[ind - 1].height += cursor.height
         print("delete")
         del cursors[ind]
-    elif merge_direction == 1:
+    elif cursor.merge_direction == 1:
         # Tricky issue: newly extended cursor will be processed after this one, and may register a hit on the same merge node!
         # How to avoid double-merging? One easy answer is that merge nodes disappear after use, but this is unsatisfactory.
         # Given how our system works, only one cursor should be on a row at a time - for it should never be the case that two cursors
         # both hit the same effector in one round. In which case, maybe the easiest thing to do is avoid activating any node twice.
         if ind < len(cursors) - 1:
             print("with", ind + 1)
-            cursors[ind + 1][0] = cursor[0]
-            cursors[ind + 1][1] += cursor[1]
+            cursors[ind + 1].start = cursor.start
+            cursors[ind + 1].height += cursor.height
         print("delete")
         del cursors[ind]
     print("new", cursors)
@@ -84,10 +96,10 @@ selected_effector = effectors[0]
 def render(grid, cursors):
     # Render the state grid to an RGB image.
     g = np.ones(grid.shape[:2] + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
-    for (start, height, _, pos, _) in cursors:
-        middle = (start + (start + height)) / 2
+    for cursor in cursors:
+        middle = (cursor.start + (cursor.start + cursor.height)) / 2
         level = (middle - 0.5) / (grid.shape[0] - 1)
-        g[start : start + height, int(pos)] = [level, 0, 1 - level]
+        g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = [level, 0, 1 - level]
     for r, c, layer in zip(*grid.nonzero()):
         value = grid[r, c, layer]
         g[r, c] = effectors[value - 1].color
@@ -122,7 +134,7 @@ def on_keypress(event):
     if event.key == "R":
         # Reset
         global cursors
-        cursors = [[0, 8, 3, 0, 1]]
+        cursors = [copy.copy(proto_cursor)]
         return
     if event.key not in keymap:
         return
@@ -161,15 +173,14 @@ def update():
     dt = now - last
     visited = set()
     for cursor in cursors[:]:
-        old_pos = int(cursor[3])
-        cursor[3] += cursor[2] * dt
-        cursor[3] %= grid.shape[1]
-        new_pos = int(cursor[3])
-        start, height = cursor[:2]
+        old_pos = int(cursor.pos)
+        cursor.pos += cursor.speed * dt
+        cursor.pos %= grid.shape[1]
+        new_pos = int(cursor.pos)
         if new_pos != old_pos:
-            hits = grid[start : start + height, new_pos, 0].nonzero()[0]
+            hits = grid[cursor.start : cursor.start + cursor.height, new_pos, 0].nonzero()[0]
             for hit in hits:
-                pos = (start + hit, new_pos)
+                pos = (cursor.start + hit, new_pos)
                 if pos in visited:
                     print(
                         f"aha, we already hit this effector ({pos}) this round; skipping for avoid merge issue."
