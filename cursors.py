@@ -23,7 +23,9 @@ class Cursor:
     def __repr__(self):
         return f"Cursor(start={self.start}, height={self.height}, speed={self.speed}, pos={self.pos}, merge_direction={self.merge_direction})"
 
+
 proto_cursor = Cursor(0, 8, 3, 0, 1)
+
 
 class GameState:
     def __init__(self, n=2):
@@ -50,12 +52,14 @@ class GameState:
             cursor.pos %= self.grid.shape[1]
             new_pos = int(cursor.pos)
             if new_pos != old_pos:
-                hits = self.grid[cursor.start : cursor.start + cursor.height, new_pos, 0].nonzero()[0]
+                hits = self.grid[
+                    cursor.start : cursor.start + cursor.height, new_pos, 0
+                ].nonzero()[0]
                 for hit in hits:
                     pos = (cursor.start + hit, new_pos)
                     if pos in visited:
                         print(
-                            f"aha, we already hit this effector ({pos}) this round; skipping for avoid merge issue."
+                            f"aha, we already hit this effector ({pos}) this round; skipping to avoid merge issue."
                         )
                         continue
                     visited.add(pos)
@@ -87,7 +91,9 @@ def split(state, cursor, pos):
     # TODO: perhaps pass in cursor index instead of the cursor itself?
     ind = state.cursors.index(cursor)
     top = Cursor(cursor.start, pos[0] - cursor.start, cursor.speed, cursor.pos, 1)
-    bottom = Cursor(pos[0], cursor.start + cursor.height - pos[0], cursor.speed, cursor.pos, -1)
+    bottom = Cursor(
+        pos[0], cursor.start + cursor.height - pos[0], cursor.speed, cursor.pos, -1
+    )
     state.cursors[ind] = top
     state.cursors.insert(ind + 1, bottom)
 
@@ -121,29 +127,15 @@ effectors = [
     Effector("split", split, (0, 0, 1)),
     Effector("merge", merge, (0, 0, 1)),
 ]
-selected_effector = effectors[0]
-
-
-def render(state):
-    # Render the state to an RGB image.
-    g = np.ones(state.grid.shape[:2] + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
-    for cursor in state.cursors:
-        middle = (cursor.start + (cursor.start + cursor.height)) / 2
-        level = (middle - 0.5) / (state.grid.shape[0] - 1)
-        g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = [level, 0, 1 - level]
-    for r, c, layer in zip(*state.grid.nonzero()):
-        value = state.grid[r, c, layer]
-        g[r, c] = effectors[value - 1].color
-    return g
 
 
 def plt_main():
     state = GameState(2)
+    selected_effector = effectors[0]
 
     matplotlib.rcParams["toolbar"] = "None"
     plt.ion()
     fig, ax = plt.subplots()
-
 
     def on_click(event):
         if event.xdata is None or event.ydata is None:
@@ -154,7 +146,6 @@ def plt_main():
         state.grid[y, x] = effectors.index(selected_effector) + 1
         # g = render(grid, cursors)
         # im.set_data(g)
-
 
     keymap = {
         "r": effectors[0],
@@ -174,9 +165,24 @@ def plt_main():
         selected_effector = keymap[event.key]
         ax.set_xlabel(selected_effector.name)
 
-
     cid = fig.canvas.mpl_connect("button_press_event", on_click)
     cid = fig.canvas.mpl_connect("key_press_event", on_keypress)
+
+    def render(state):
+        # Render the state to an RGB image.
+        g = np.ones(state.grid.shape[:2] + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
+        for cursor in state.cursors:
+            middle = (cursor.start + (cursor.start + cursor.height)) / 2
+            level = (middle - 0.5) / (state.grid.shape[0] - 1)
+            g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = [
+                level,
+                0,
+                1 - level,
+            ]
+        for r, c, layer in zip(*state.grid.nonzero()):
+            value = state.grid[r, c, layer]
+            g[r, c] = effectors[value - 1].color
+        return g
 
     ax.tick_params(
         axis="both",
@@ -210,5 +216,5 @@ def plt_main():
         plt.pause(0.001)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     plt_main()
