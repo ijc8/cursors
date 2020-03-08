@@ -3,6 +3,8 @@ import numpy as np
 import my_launchpad as launchpad
 import select
 import sys
+import cursors
+import json
 
 
 def from_grid(x, y):
@@ -20,14 +22,42 @@ def decode_byte(c):
 def encode_byte(pos, color):
     return pos[0] | (pos[1] << 3) | (int(color[0] // 3) << 6) | (int(color[1] // 3) << 7)
 
+def render(state):
+    # Render the state for the Launchpad.
+    g = np.zeros(state.grid.shape[:2] + (2,), dtype=np.int)
+    for cursor in state.cursors:
+        middle = (cursor.start + (cursor.start + cursor.height)) / 2
+        level = (middle - 0.5) / (state.grid.shape[0] - 1)
+        g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = [
+            3, # round(level * 3),
+            3, # 3 - round(level * 3),
+        ]
+    for r, c in zip(*state.grid.nonzero()):
+        value = state.grid[r, c]
+        # g[r, c] = effectors[value - 1].color
+        g[r, c] = [0, 3]
+
+    return g[:8, :8, :].swapaxes(0, 1)  # return first square
+
+
+# Thoughts on protocol:
+# - update to cursor position
+# - update to cursor list
+# - change to board: remove f at (x, y), or add f at (x, y). more complicated with lifespan.
+# 00XXXYYY: update cursor #XXX to have position YYY.
+# 10XXXYYY: remove something at (x, y), to be specified in the next byte
+# 11XXXYYY: add something at (x, y), to be specified in the next byte
+# But for now, this is premature optimization! Let's just be verbose and use readline().
+
 
 class LaunchpadException(Exception):
     pass
 
 
-class LaunchpadClient:
+class CursorClient:
     def __init__(self):
         self.lp = launchpad.Launchpad()
+        self.mirror_state = cursors.GameState()
 
     def open(self, host):
         if not self.lp.Open():
@@ -36,26 +66,21 @@ class LaunchpadClient:
         self.frame = np.zeros((8, 8, 2))
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, 8765))
+        self.sockf = self.socket.makefile('r')
 
     def close(self):
         self.lp.Reset()
         self.lp.Close()
 
     def update_frame(self):
+        self.next_frame = render(self.mirror_state)
         r = np.where(self.next_frame != self.frame)
         xs, ys, _ = r
         # Ignore duplicates.
         points = set(zip(xs, ys))
-        # data = []
-        # print(points)
         for x, y in points:
             color = self.next_frame[x, y]
-            # print(x, y, color)
             self.lp.LedCtrlRaw(from_grid(x, y), *color)
-        #     data.append(encode_byte((x, y), color))
-        # if data:
-        #     print(len(bytes(data)), bytes(data))
-        #     self.socket.send(bytes(data))
         self.frame = self.next_frame
 
     def handle_input(self, event):
@@ -70,10 +95,16 @@ class LaunchpadClient:
             rs, _, _ = select.select([self.socket], [], [], 0)
             if not rs:
                 break
-            c = self.socket.recv(1)
-            pos, color = decode_byte(c[0])
-            # print(c, pos, color)
-            self.next_frame[pos] = color
+            #c = self.socket.recv(1)
+            data = json.loads(self.sockf.readline())
+            self.mirror_state.grid = np.zeros(self.mirror_state.grid.shape, dtype=np.int)
+            self.mirror_state.cursors = [cursors.Cursor(*d) for d in data['cursors']]
+            for x, y, value in data.get('grid', []):
+                self.mirror_state.grid[x, y] = value
+            for event in data.get('events', []):
+                print(f'Event: {event}')
+            # pos, color = decode_byte(c[0])
+            # self.next_frame[pos] = color
 
     def run(self):
         while True:
@@ -87,11 +118,11 @@ class LaunchpadClient:
 
 
 if __name__ == '__main__':
-    lc = LaunchpadClient()
-    lc.open(sys.argv[1])
+    c = CursorClient()
+    c.open(sys.argv[1])
     try:
-        lc.run()
+        c.run()
     except KeyboardInterrupt:
         pass
     finally:
-        lc.close()
+        c.close()

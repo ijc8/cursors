@@ -6,6 +6,7 @@ import time
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import json
 
 clients = set()
 state = cursors.GameState()
@@ -27,9 +28,17 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    pass
+    allow_reuse_address = True
 
-ThreadedTCPServer.allow_reuse_addr = True
+# https://stackoverflow.com/questions/26646362/numpy-array-is-not-json-serializable
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if type(obj).__module__ == np.__name__:
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return obj.item()
+        return json.JSONEncoder.default(self, obj)
 
 
 # TODO: support all 9 colors, instead of just 4.
@@ -40,23 +49,6 @@ def decode_byte(c):
     pos = (c & 0b111, (c >> 3) & 0b111)
     color = (((c >> 6) & 1) * 3, ((c >> 7) & 1) * 3)
     return (pos, color)
-
-def render(state):
-    # Render the state for the Launchpad.
-    g = np.zeros(state.grid.shape[:2] + (2,), dtype=np.int)
-    for cursor in state.cursors:
-        middle = (cursor.start + (cursor.start + cursor.height)) / 2
-        level = (middle - 0.5) / (state.grid.shape[0] - 1)
-        g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = [
-            3, # round(level * 3),
-            3, # 3 - round(level * 3),
-        ]
-    for r, c, layer in zip(*state.grid.nonzero()):
-        value = state.grid[r, c, layer]
-        # g[r, c] = effectors[value - 1].color
-        g[r, c] = [0, 3]
-
-    return g[:8, :8, :].swapaxes(0, 1)  # return first square
 
 def run():
     ### PLT stuff ###
@@ -99,7 +91,7 @@ def run():
 
     def plt_render(state):
         # Render the state to an RGB image.
-        g = np.ones(state.grid.shape[:2] + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
+        g = np.ones(state.grid.shape + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
         for cursor in state.cursors:
             middle = (cursor.start + (cursor.start + cursor.height)) / 2
             level = (middle - 0.5) / (state.grid.shape[0] - 1)
@@ -108,8 +100,8 @@ def run():
                 0,
                 1 - level,
             ]
-        for r, c, layer in zip(*state.grid.nonzero()):
-            value = state.grid[r, c, layer]
+        for r, c in zip(*state.grid.nonzero()):
+            value = state.grid[r, c]
             g[r, c] = cursors.effectors[value - 1].color
         return g
 
@@ -129,34 +121,34 @@ def run():
     ax.tick_params(which="minor", bottom=False, left=False)
     for edge, spine in ax.spines.items():
         spine.set_visible(False)
-    im = ax.imshow(state.grid[:, :, 0])
+    im = ax.imshow(state.grid[:, :])
     ### END PLT STUFF
 
     last = time.time()
-    last_frame = np.zeros((8, 8, 2))
+    # last_frame = np.zeros((8, 8, 2))
 
     while True:
         now = time.time()
-        state.update(now - last)
+        events = state.update(now - last)
         last = now
-
 
         g = plt_render(state)
         im.set_data(g)
 
-        frame = render(state)
-        r = np.where(frame != last_frame)
-        xs, ys, _ = r
-        # Ignore duplicates.
-        points = set(zip(xs, ys))
-        data = []
-        for x, y in points:
-            color = frame[x, y]
-            data.append(encode_byte((x, y), color))
+        points = np.array(state.grid.nonzero()).T
+        grid_info = []
+        for p in points:
+            grid_info.append([*p, state.grid[(*p,)]])
+        data = {'cursors': [c.dump() for c in state.cursors]}
+        if grid_info:
+            data['grid'] = grid_info
+        if events:
+            data['events'] = events
+        data = json.dumps(data, cls=NumpyEncoder)
         if data:
             for client in clients:
-                client.send(bytes(data))
-        last_frame = frame
+                client.send(bytes(data + '\n', 'utf8'))
+        # last_frame = frame
 
         plt.pause(0.0001)
 

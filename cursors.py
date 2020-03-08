@@ -20,6 +20,9 @@ class Cursor:
         self.pos = pos
         self.merge_direction = merge_direction
 
+    def dump(self):
+        return [self.start, self.height, self.speed, self.pos, self.merge_direction]
+
     def __repr__(self):
         return f"Cursor(start={self.start}, height={self.height}, speed={self.speed}, pos={self.pos}, merge_direction={self.merge_direction})"
 
@@ -35,15 +38,18 @@ class GameState:
         """
         self.cursors = [copy.copy(proto_cursor)]
         shape = (8, 16)
-        # MxNx2; first MxN is sequencer layer, second is 'active'/'playing field' layer.
+        # MxN playing field of different effects & triggers.
+        # TODO: Will each element be a bitmask of things at that location?
+        # Seem like no, if effectors have their own parameters (lifespan, maybe destination for warps)
         # This describes state, *not* appearence.
-        self.grid = np.zeros(shape + (2,), dtype=np.int)
+        self.grid = np.zeros(shape, dtype=np.int)
 
     def reset_cursors(self):
         self.cursors = [copy.copy(proto_cursor)]
 
     def update(self, dt):
         visited = set()
+        events = []
         for cursor in self.cursors[:]:
             old_pos = int(cursor.pos)
             # NOTE: This does not handle the case where dt is so large that multiple steps have passed.
@@ -53,7 +59,7 @@ class GameState:
             new_pos = int(cursor.pos)
             if new_pos != old_pos:
                 hits = self.grid[
-                    cursor.start : cursor.start + cursor.height, new_pos, 0
+                    cursor.start : cursor.start + cursor.height, new_pos
                 ].nonzero()[0]
                 for hit in hits:
                     pos = (cursor.start + hit, new_pos)
@@ -63,9 +69,11 @@ class GameState:
                         )
                         continue
                     visited.add(pos)
-                    effector = effectors[self.grid[pos[0], pos[1], 0] - 1]
+                    effector = effectors[self.grid[pos[0], pos[1]] - 1]
                     print(f"we hit {effector.name} at {pos}!")
+                    events.append([effector.name, *pos, cursor.height, cursor.speed])
                     effector.function(self, cursor, pos)
+        return events
 
 
 class Effector:
@@ -123,7 +131,7 @@ def merge(state, cursor, _):
 
 
 def trigger(state, cursor, pos):
-    return bytes([*pos, cursor.height, cursor.speed])
+    pass  # doesn't modify game state
 
 
 effectors = [
