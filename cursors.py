@@ -122,99 +122,12 @@ def merge(state, cursor, _):
     print("new", state.cursors)
 
 
+def trigger(state, cursor, pos):
+    return bytes([*pos, cursor.height, cursor.speed])
+
+
 effectors = [
     Effector("reverse", reverse, (0, 1, 0)),
     Effector("split", split, (0, 0, 1)),
     Effector("merge", merge, (0, 0, 1)),
 ]
-
-
-def plt_main():
-    state = GameState(2)
-    selected_effector = effectors[0]
-
-    matplotlib.rcParams["toolbar"] = "None"
-    plt.ion()
-    fig, ax = plt.subplots()
-
-    def on_click(event):
-        if event.xdata is None or event.ydata is None:
-            return
-        x = int(round(event.xdata))
-        y = int(round(event.ydata))
-        print(x, y)
-        state.grid[y, x] = effectors.index(selected_effector) + 1
-        # g = render(grid, cursors)
-        # im.set_data(g)
-
-    keymap = {
-        "r": effectors[0],
-        "s": effectors[1],
-        # 'w': 'warp',
-        "m": effectors[2],  # or 'join'?
-    }
-
-    def on_keypress(event):
-        if event.key == "R":
-            # Reset
-            state.reset_cursors()
-            return
-        if event.key not in keymap:
-            return
-        global selected_effector
-        selected_effector = keymap[event.key]
-        ax.set_xlabel(selected_effector.name)
-
-    cid = fig.canvas.mpl_connect("button_press_event", on_click)
-    cid = fig.canvas.mpl_connect("key_press_event", on_keypress)
-
-    def render(state):
-        # Render the state to an RGB image.
-        g = np.ones(state.grid.shape[:2] + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
-        for cursor in state.cursors:
-            middle = (cursor.start + (cursor.start + cursor.height)) / 2
-            level = (middle - 0.5) / (state.grid.shape[0] - 1)
-            g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = [
-                level,
-                0,
-                1 - level,
-            ]
-        for r, c, layer in zip(*state.grid.nonzero()):
-            value = state.grid[r, c, layer]
-            g[r, c] = effectors[value - 1].color
-        return g
-
-    ax.tick_params(
-        axis="both",
-        which="both",
-        bottom=False,
-        top=False,
-        labelbottom=False,
-        right=False,
-        left=False,
-        labelleft=False,
-    )
-    ax.set_xticks(np.arange(state.grid.shape[1] + 1) - 0.5, minor=True)
-    ax.set_yticks(np.arange(state.grid.shape[0] + 1) - 0.5, minor=True)
-    ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
-    ax.tick_params(which="minor", bottom=False, left=False)
-    for edge, spine in ax.spines.items():
-        spine.set_visible(False)
-    im = ax.imshow(state.grid[:, :, 0])
-
-    last = time.time()
-
-    while True:
-        g = render(state)
-        im.set_data(g)
-
-        now = time.time()
-        dt = now - last
-        state.update(dt)
-        last = now
-
-        plt.pause(0.001)
-
-
-if __name__ == "__main__":
-    plt_main()

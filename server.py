@@ -137,7 +137,7 @@ def run():
 
     while True:
         now = time.time()
-        state.update(last - now)
+        state.update(now - last)
         last = now
 
 
@@ -154,7 +154,6 @@ def run():
             color = frame[x, y]
             data.append(encode_byte((x, y), color))
         if data:
-            # print(len(bytes(data)), bytes(data))
             for client in clients:
                 client.send(bytes(data))
         last_frame = frame
