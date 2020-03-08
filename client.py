@@ -50,7 +50,7 @@ class LaunchpadClient:
         # print(points)
         for x, y in points:
             color = self.next_frame[x, y]
-            print(x, y, color)
+            # print(x, y, color)
             self.lp.LedCtrlRaw(from_grid(x, y), *color)
         #     data.append(encode_byte((x, y), color))
         # if data:
@@ -61,9 +61,9 @@ class LaunchpadClient:
     def handle_input(self, event):
         if not event[1]:
             return
-        print(event)
         pos = to_grid(event[0])
-        # self.socket.send(bytes(encode_byte(pos, color)))
+        data = bytes([encode_byte(pos, (3, 3))])
+        self.socket.send(data)
 
     def poll_server(self):
         while True:
@@ -72,7 +72,7 @@ class LaunchpadClient:
                 break
             c = self.socket.recv(1)
             pos, color = decode_byte(c[0])
-            print(c, pos, color)
+            # print(c, pos, color)
             self.next_frame[pos] = color
 
     def run(self):
