@@ -135,6 +135,7 @@ def trigger(state, cursor, pos):
 
 
 effectors = [
+    Effector("note", trigger, (1, 0, 0)),
     Effector("reverse", reverse, (0, 1, 0)),
     Effector("split", split, (0, 0, 1)),
     Effector("merge", merge, (0, 0, 1)),

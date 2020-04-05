@@ -20,8 +20,8 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             if not data:
                 break
             print("{} wrote:".format(self.client_address[0]))
-            (x, y), color = decode_byte(data[0])
-            state.grid[y, x] = 1
+            (x, y), (effector, _) = decode_byte(data[0])
+            state.grid[y, x] = effector + 1
             for client in clients:
                 if client is not self.request:
                     client.send(data)
@@ -69,10 +69,11 @@ def run():
         # im.set_data(g)
 
     keymap = {
-        "r": cursors.effectors[0],
-        "s": cursors.effectors[1],
+        "n": cursors.effectors[0],
+        "r": cursors.effectors[1],
+        "s": cursors.effectors[2],
         # 'w': 'warp',
-        "m": cursors.effectors[2],  # or 'join'?
+        "m": cursors.effectors[3],  # or 'join'?
     }
 
     def on_keypress(event):
