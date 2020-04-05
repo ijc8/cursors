@@ -41,10 +41,6 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-# TODO: support all 9 colors, instead of just 4.
-def encode_byte(pos, color):
-    return pos[0] | (pos[1] << 3) | (int(color[0] // 3) << 6) | (int(color[1] // 3) << 7)
-
 def decode_byte(c):
     pos = (c & 0b111, (c >> 3) & 0b111)
     color = (((c >> 6) & 1) * 3, ((c >> 7) & 1) * 3)
