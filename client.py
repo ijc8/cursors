@@ -111,7 +111,9 @@ class CursorClient:
                 self.mirror_state.grid[x, y] = value
             for event in data.get('events', []):
                 print(f'Event: {event}')
-                self.client.send_message(b'/test', b'event')
+                # TODO: figure out timing for Max playback
+                event[0] = event[0].encode('utf8')
+                self.client.send_message(b'/cursors', event)
 
     def run(self):
         while True:

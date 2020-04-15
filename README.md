@@ -15,4 +15,5 @@ instrument for FaMLE
     # Run the client (make sure your launchpad is plugged in):
     python client.py localhost
 
-Currently, test OSC messages are sent to `localhost:8000` on `/test`.
+Currently, OSC messages are sent to `localhost:8000` on `/cursors`.
+The contents of the messages are effector-type (string), x, y, cursor size, cursor speed (all ints)
