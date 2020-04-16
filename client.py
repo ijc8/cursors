@@ -21,8 +21,9 @@ def to_grid(v):
     return (v % 16, v // 16)
 
 
-def encode_byte(pos, color):
-    return pos[0] | (pos[1] << 3) | (int(color[0] // 3) << 6) | (int(color[1] // 3) << 7)
+def encode_bytes(pos, effector):
+    # TODO: two unused bits
+    return bytes([pos[0] | (pos[1] << 3), effector])
 
 
 def render(state, modifiers):
@@ -96,7 +97,7 @@ class CursorClient:
             if event[1]:
                 self.selected_effector = pos[1]
         elif event[1]:
-            data = bytes([encode_byte(pos, (self.selected_effector, 3))])
+            data = encode_bytes(pos, self.selected_effector)
             self.socket.send(data)
 
     def poll_server(self):

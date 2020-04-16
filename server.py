@@ -16,11 +16,11 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         clients.add(self.request)
         while True:
             # self.request is the TCP socket connected to the client
-            data = self.request.recv(1)
+            data = self.request.recv(2)
             if not data:
                 break
             print("{} wrote:".format(self.client_address[0]))
-            (x, y), (effector, _) = decode_byte(data[0])
+            (x, y), effector = decode_bytes(data)
             state.grid[y, x] = effector + 1
             for client in clients:
                 if client is not self.request:
@@ -41,10 +41,10 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def decode_byte(c):
-    pos = (c & 0b111, (c >> 3) & 0b111)
-    color = (((c >> 6) & 1) * 3, ((c >> 7) & 1) * 3)
-    return (pos, color)
+def decode_bytes(b):
+    pos = (b[0] & 0b111, (b[0] >> 3) & 0b111)
+    effector = b[1]
+    return (pos, effector)
 
 def run():
     ### PLT stuff ###
