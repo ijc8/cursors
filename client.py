@@ -25,32 +25,36 @@ def encode_byte(pos, color):
     return pos[0] | (pos[1] << 3) | (int(color[0] // 3) << 6) | (int(color[1] // 3) << 7)
 
 
-effector_colors = [
-    (2, 1),
-    (2, 3),
-    (3, 0),
-    (0, 3),
-]
-
-
 def render(state, modifiers):
     # Render the state for the Launchpad.
-    g = np.zeros(state.grid.shape[:2] + (2,), dtype=np.int)
+    g = np.zeros((8, 9, 2), dtype=np.int)
     for cursor in state.cursors:
-        middle = (cursor.start + (cursor.start + cursor.height)) / 2
-        level = (middle - 0.5) / (state.grid.shape[0] - 1)
-        g[cursor.start: cursor.start + cursor.height, int(cursor.pos)] = [
-            3,  # round(level * 3),
-            3,  # 3 - round(level * 3),
-        ]
+        # TODO adjust bounds for each player's client
+        if 0 <= cursor.pos < 8:
+            middle = (cursor.start + (cursor.start + cursor.height)) / 2
+            level = (middle - 0.5) / (state.grid.shape[0] - 1)
+            g[cursor.start: cursor.start + cursor.height, int(cursor.pos)] = [1, 1]
+
+    # Uncomment to examine the Launchpad's palette:
+    # for r in range(4):
+    #     for y in range(4):
+    #         g[r, y] = [r, y]
+
     show_all = not any(modifiers)
     for r, c in zip(*state.grid.nonzero()):
-        value = state.grid[r, c]
-        if show_all or modifiers[value - 1]:
-            # g[r, c] = effectors[value - 1].color
-            g[r, c] = effector_colors[value - 1]
+        # TODO adjust bounds for each player's client
+        if 0 <= c < 8:
+            value = state.grid[r, c]
+            if show_all or modifiers[value - 1]:
+                g[r, c] = cursors.effectors[value - 1].lc_color
 
-    return g[:8, :8, :].swapaxes(0, 1)  # return first square
+    # Set column button colors to match the effectors they select.
+    for i, effector in enumerate(cursors.effectors):
+        if not modifiers[i]:
+            # Feedback: when select button is pressed, light turns off.
+            g[i, 8] = effector.lc_color
+
+    return g.swapaxes(0, 1)
 
 
 class CursorClient:
@@ -63,7 +67,7 @@ class CursorClient:
     def open(self, host):
         self.lp.open()
         self.lp.flush_button_events()
-        self.frame = np.zeros((8, 8, 2))
+        self.frame = np.zeros((9, 8, 2))
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, 8765))
         self.sockf = self.socket.makefile('r')

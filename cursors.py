@@ -47,6 +47,10 @@ class GameState:
     def reset_cursors(self):
         self.cursors = [copy.copy(proto_cursor)]
 
+    def get_warps(self):
+        # TODO convenient way to go from effector name to id
+        return list(np.unique(np.where(self.grid == 5)[1]))
+
     def update(self, dt):
         visited = set()
         events = []
@@ -77,10 +81,11 @@ class GameState:
 
 
 class Effector:
-    def __init__(self, name, function, color):
+    def __init__(self, name, function, color, lc_color):
         self.name = name
         self.function = function
         self.color = color
+        self.lc_color = lc_color
 
 
 def reverse(state, cursor, _):
@@ -130,13 +135,19 @@ def merge(state, cursor, _):
     print("new", state.cursors)
 
 
+def warp(state, cursor, pos):
+    warps = state.get_warps()
+    cursor.pos = warps[(warps.index(pos[1]) + 1) % len(warps)]
+
+
 def trigger(state, cursor, pos):
     pass  # doesn't modify game state
 
 
 effectors = [
-    Effector("note", trigger, (1, 0, 0)),
-    Effector("reverse", reverse, (0, 1, 0)),
-    Effector("split", split, (0, 0, 1)),
-    Effector("merge", merge, (0, 0, 1)),
+    Effector("note", trigger, (1, 0, 0), (0, 1)),
+    Effector("reverse", reverse, (0, 1, 0), (3, 2)),
+    Effector("split", split, (0, 0, 1), (3, 0)),
+    Effector("merge", merge, (0, 0, 1), (1, 0)),
+    Effector("warp", warp, (1, 1, 0), (2, 3))
 ]

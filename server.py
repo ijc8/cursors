@@ -68,8 +68,8 @@ def run():
         "n": cursors.effectors[0],
         "r": cursors.effectors[1],
         "s": cursors.effectors[2],
-        # 'w': 'warp',
         "m": cursors.effectors[3],  # or 'join'?
+        "w": cursors.effectors[4],
     }
 
     def on_keypress(event):
