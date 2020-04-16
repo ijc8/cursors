@@ -21,6 +21,17 @@ def encode_color(red, green):
     assert(0 <= red <= 3 and 0 <= green <= 3)
     return red | (green << 4)
 
+def encode_color3(red, green):
+    # Convert launchpad 2 colors to launchpad 3 palette.
+    assert(0 <= red <= 3 and 0 <= green <= 3)
+    # TODO improve mapping
+    colors = [
+        [0, 19, 18, 17],
+        [7, 83, 62, 13],
+        [6, 11, 61, 9],
+        [5, 72, 84, 96],
+    ]
+    return colors[red][green]
 
 class LaunchpadException(Exception):
     pass
@@ -65,6 +76,16 @@ class Launchpad:
             raise LaunchpadException("No launchpad detected.")
         self.midi_in = rtmidi.MidiIn().open_port(ins[0])
         self.midi_out = rtmidi.MidiOut().open_port(outs[0])
+        self.encode_color = encode_color
+        if "Mk3" in self.midi_out.get_port_name(outs[0]):
+            print("Mk3 detected, emulating Mk2.")
+            # DAW mode
+            self.midi_out.send_message([240, 0, 32, 41, 2, 16, 33, 0, 247])
+            # Live mode
+            self.midi_out.send_message([240, 0, 32, 41, 2, 13, 14, 0, 247])
+            # Session layout
+            self.midi_out.send_message([240, 0, 32, 41, 2, 13, 0, 0, 247])
+            self.encode_color = encode_color3
 
     def close(self):
         if self.midi_in:
@@ -87,7 +108,7 @@ class Launchpad:
     # Controls a grid LED by its raw <number>; with <green/red> brightness: 0..3
     # For LED numbers, see grid description on top of class.
     def set_led(self, pos, red, green):
-        color = encode_color(red, green)
+        color = self.encode_color(red, green)
         if pos > 199:
             assert(200 <= pos <= 207)
             # Different command for top row of buttons.
