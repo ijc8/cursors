@@ -149,12 +149,12 @@ def run():
 
         plt.pause(0.0001)
 
-run_thread = threading.Thread(target=run)
-run_thread.start()
 
-with ThreadedTCPServer(('0.0.0.0', 8765), MyTCPHandler) as server:
-    # Activate the server; this will keep running until you
-    # interrupt the program with Ctrl-C
-    # server_thread = threading.Thread(target=server.serve_forever)
-    # server_thread.start()
-    server.serve_forever()
+def serve():
+    with ThreadedTCPServer(('0.0.0.0', 8765), MyTCPHandler) as server:
+        server.serve_forever()
+
+
+serve_thread = threading.Thread(target=serve)
+serve_thread.start()
+run()
