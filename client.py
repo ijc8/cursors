@@ -21,9 +21,10 @@ def to_grid(v):
     return (v % 16, v // 16)
 
 
-def encode_bytes(pos, effector):
-    # TODO: two unused bits
-    return bytes([pos[0] | (pos[1] << 3), effector])
+def encode_bytes(window, pos, effector):
+    first = window | (pos[0] << 5)
+    second = pos[1] | (effector << 3)
+    return bytes([first, second])
 
 
 def render(state, modifiers, start_col):
@@ -97,9 +98,11 @@ class CursorClient:
             print(f'Column button {pos[1]} {event[1]}')
             self.modifiers[pos[1]] = event[1]
             if event[1]:
-                self.selected_effector = pos[1]
+                self.selected_effector = pos[1] + 1
+                if self.selected_effector >= len(cursors.effectors):
+                    self.selected_effector = 0
         elif event[1]:
-            data = encode_bytes(pos, self.selected_effector)
+            data = encode_bytes(self.player_id, pos, self.selected_effector)
             self.socket.send(data)
 
     def poll_server(self):

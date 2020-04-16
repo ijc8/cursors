@@ -25,7 +25,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                     break
                 print("{} wrote:".format(self.client_address[0]))
                 (x, y), effector = decode_bytes(data)
-                state.grid[y, x] = effector + 1
+                state.grid[y, x] = effector
         except ConnectionResetError:
             pass
 
@@ -50,8 +50,10 @@ class NumpyEncoder(json.JSONEncoder):
 
 
 def decode_bytes(b):
-    pos = (b[0] & 0b111, (b[0] >> 3) & 0b111)
-    effector = b[1]
+    first, second = b
+    window = first & 0b11111
+    pos = ((first >> 5) + (window * 8), second & 0b111)
+    effector = second >> 3
     return (pos, effector)
 
 
