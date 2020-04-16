@@ -26,15 +26,16 @@ def encode_bytes(pos, effector):
     return bytes([pos[0] | (pos[1] << 3), effector])
 
 
-def render(state, modifiers):
+def render(state, modifiers, start_col):
     # Render the state for the Launchpad.
+    # Each player gets an 8-column window into the full game state.
     g = np.zeros((8, 9, 2), dtype=np.int)
     for cursor in state.cursors:
         # TODO adjust bounds for each player's client
-        if 0 <= cursor.pos < 8:
+        if start_col <= cursor.pos < start_col + 8:
             middle = (cursor.start + (cursor.start + cursor.height)) / 2
             level = (middle - 0.5) / (state.grid.shape[0] - 1)
-            g[cursor.start: cursor.start + cursor.height, int(cursor.pos)] = [1, 1]
+            g[cursor.start: cursor.start + cursor.height, int(cursor.pos) - start_col] = [1, 1]
 
     # Uncomment to examine the Launchpad's palette:
     # for r in range(4):
@@ -44,10 +45,10 @@ def render(state, modifiers):
     show_all = not any(modifiers)
     for r, c in zip(*state.grid.nonzero()):
         # TODO adjust bounds for each player's client
-        if 0 <= c < 8:
+        if start_col <= c < start_col + 8:
             value = state.grid[r, c]
             if show_all or modifiers[value - 1]:
-                g[r, c] = cursors.effectors[value - 1].lc_color
+                g[r, c - start_col] = cursors.effectors[value - 1].lc_color
 
     # Set column button colors to match the effectors they select.
     for i, effector in enumerate(cursors.effectors):
@@ -59,7 +60,8 @@ def render(state, modifiers):
 
 
 class CursorClient:
-    def __init__(self):
+    def __init__(self, player_id):
+        self.player_id = player_id
         self.lp = launchpad.Launchpad()
         self.mirror_state = cursors.GameState()
         self.modifiers = [False] * 8
@@ -79,7 +81,7 @@ class CursorClient:
         self.lp.close()
 
     def update_frame(self):
-        self.next_frame = render(self.mirror_state, self.modifiers)
+        self.next_frame = render(self.mirror_state, self.modifiers, self.player_id * 8)
         r = np.where(self.next_frame != self.frame)
         xs, ys, _ = r
         # Ignore duplicates.
@@ -132,7 +134,10 @@ class CursorClient:
 
 
 if __name__ == '__main__':
-    c = CursorClient()
+    # Eventually, we might want to assign player numbers automatically.
+    if len(sys.argv) < 3:
+        exit('usage: client.py <server address> <player number>')
+    c = CursorClient(int(sys.argv[2]))
     c.open(sys.argv[1])
     try:
         c.run()

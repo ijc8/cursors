@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
+import json
 import socketserver
-import cursors
+import sys
 import threading
 import time
+
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-import json
 
-clients = set()
-state = cursors.GameState()
+import cursors
+
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         clients.add(self.request)
+        print(f"-> {self.client_address[0]} connected")
+
         while True:
             # self.request is the TCP socket connected to the client
             data = self.request.recv(2)
@@ -22,13 +25,15 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             print("{} wrote:".format(self.client_address[0]))
             (x, y), effector = decode_bytes(data)
             state.grid[y, x] = effector + 1
-            for client in clients:
-                if client is not self.request:
-                    client.send(data)
+
+        clients.remove(self.request)
+        print(f"<- {self.client_address[0]} disconnected")
 
 
+# TODO: could just select() instead.
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
+
 
 # https://stackoverflow.com/questions/26646362/numpy-array-is-not-json-serializable
 class NumpyEncoder(json.JSONEncoder):
@@ -46,13 +51,14 @@ def decode_bytes(b):
     effector = b[1]
     return (pos, effector)
 
+
 def run():
     ### PLT stuff ###
     selected_effector = cursors.effectors[0]
 
     matplotlib.rcParams["toolbar"] = "None"
     plt.ion()
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=tuple(s // 2 for s in state.grid.shape[::-1]))
 
     def on_click(event):
         if event.xdata is None or event.ydata is None:
@@ -136,25 +142,30 @@ def run():
         grid_info = []
         for p in points:
             grid_info.append([*p, state.grid[(*p,)]])
-        data = {'cursors': [c.dump() for c in state.cursors]}
+        data = {"cursors": [c.dump() for c in state.cursors]}
         if grid_info:
-            data['grid'] = grid_info
+            data["grid"] = grid_info
         if events:
-            data['events'] = events
+            data["events"] = events
         data = json.dumps(data, cls=NumpyEncoder)
         if data:
             for client in clients:
-                client.send(bytes(data + '\n', 'utf8'))
+                client.send(bytes(data + "\n", "utf8"))
         # last_frame = frame
 
         plt.pause(0.0001)
 
 
 def serve():
-    with ThreadedTCPServer(('0.0.0.0', 8765), MyTCPHandler) as server:
+    with ThreadedTCPServer(("0.0.0.0", 8765), MyTCPHandler) as server:
         server.serve_forever()
 
 
-serve_thread = threading.Thread(target=serve)
-serve_thread.start()
-run()
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        exit('usage: server.py <number of players>')
+    state = cursors.GameState(int(sys.argv[1]))
+    clients = set()
+    serve_thread = threading.Thread(target=serve)
+    serve_thread.start()
+    run()

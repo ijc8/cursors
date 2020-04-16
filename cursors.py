@@ -37,7 +37,7 @@ class GameState:
         n is the number of consecutive square grids (probably equal to the number of players).
         """
         self.cursors = [copy.copy(proto_cursor)]
-        shape = (8, 16)
+        shape = (8, n * 8)
         # MxN playing field of different effects & triggers.
         # TODO: Will each element be a bitmask of things at that location?
         # Seem like no, if effectors have their own parameters (lifespan, maybe destination for warps)
@@ -112,6 +112,10 @@ def split(state, cursor, pos):
 
 
 def merge(state, cursor, _):
+    # Special case: if there's only one cursor, don't delete it.
+    if len(state.cursors) == 1:
+        return
+
     ind = state.cursors.index(cursor)
     print("old", state.cursors)
     print("merge", ind, cursor.merge_direction)
