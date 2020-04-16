@@ -99,7 +99,7 @@ class CursorClient:
             self.modifiers[pos[1]] = event[1]
             if event[1]:
                 self.selected_effector = pos[1] + 1
-                if self.selected_effector >= len(cursors.effectors):
+                if self.selected_effector > len(cursors.effectors):
                     self.selected_effector = 0
         elif event[1]:
             data = encode_bytes(self.player_id, pos, self.selected_effector)
