@@ -17,14 +17,17 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         clients.add(self.request)
         print(f"-> {self.client_address[0]} connected")
 
-        while True:
-            # self.request is the TCP socket connected to the client
-            data = self.request.recv(2)
-            if not data:
-                break
-            print("{} wrote:".format(self.client_address[0]))
-            (x, y), effector = decode_bytes(data)
-            state.grid[y, x] = effector + 1
+        try:
+            while True:
+                # self.request is the TCP socket connected to the client
+                data = self.request.recv(2)
+                if not data:
+                    break
+                print("{} wrote:".format(self.client_address[0]))
+                (x, y), effector = decode_bytes(data)
+                state.grid[y, x] = effector + 1
+        except ConnectionResetError:
+            pass
 
         clients.remove(self.request)
         print(f"<- {self.client_address[0]} disconnected")
