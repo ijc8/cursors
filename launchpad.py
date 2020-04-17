@@ -180,7 +180,7 @@ class Launchpad:
     def get_button_event(self):
         m = self.midi_in.get_message()
         if m:
-            pos = m[0][1] if m[0][0] == 144 else m[0][1] + 96
+            pos = m[0][1] if m[0][0] in (144, 176) else m[0][1] + 96
             state = True if m[0][2] > 0 else False
             return (self.decode_pos(pos), state)
         return None
