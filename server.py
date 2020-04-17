@@ -23,6 +23,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                 data = self.request.recv(2)
                 if not data:
                     break
+                assert(len(data) == 2)
                 print("{} wrote:".format(self.client_address[0]))
                 (x, y), effector = decode_bytes(data)
                 state.grid[y, x] = effector

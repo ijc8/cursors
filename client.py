@@ -8,19 +8,6 @@ import json
 from oscpy.client import OSCClient
 
 
-def from_grid(x, y):
-    # Assume x and y are in range (0, 8).
-    return x + y * 16
-
-
-def to_grid(v):
-    # Call the row buttons the row -1, since they are above the rest of the grid.
-    if v >= 200:
-        return (-1, v - 200)
-    # Implicitly call the column buttons column 8, since they are to the right of the rest of the grid.
-    return (v % 16, v // 16)
-
-
 def encode_bytes(window, pos, effector):
     first = window | (pos[0] << 5)
     second = pos[1] | (effector << 3)
@@ -66,7 +53,7 @@ class CursorClient:
         self.lp = launchpad.Launchpad()
         self.mirror_state = cursors.GameState()
         self.modifiers = [False] * 8
-        self.selected_effector = 0
+        self.selected_effector = 1
 
     def open(self, host):
         self.lp.open()
@@ -89,11 +76,11 @@ class CursorClient:
         points = set(zip(xs, ys))
         for x, y in points:
             color = self.next_frame[x, y]
-            self.lp.set_led(from_grid(x, y), *color)
+            self.lp.set_led(x, y, *color)
         self.frame = self.next_frame
 
     def handle_input(self, event):
-        pos = to_grid(event[0])
+        pos = event[0]
         if pos[0] == 8:
             print(f'Column button {pos[1]} {event[1]}')
             self.modifiers[pos[1]] = event[1]
