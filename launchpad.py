@@ -74,18 +74,18 @@ class Launchpad:
         ins, outs = find_midi_devices(name)
         if not ins or not outs:
             raise LaunchpadException("No launchpad detected.")
-        self.midi_in = rtmidi.MidiIn().open_port(ins[0])
-        self.midi_out = rtmidi.MidiOut().open_port(outs[0])
-        self.encode_color = encode_color
-        if "Mk3" in self.midi_out.get_port_name(outs[0]):
+        if "MK3" in self.midi_out.get_port_name(outs[0]):
+            ins, outs = find_midi_devices("MK3 MIDI")
+            self.midi_in = rtmidi.MidiIn().open_port(ins[0])
+            self.midi_out = rtmidi.MidiOut().open_port(outs[0])
             print("Mk3 detected, emulating Mk2.")
-            # DAW mode
-            self.midi_out.send_message([240, 0, 32, 41, 2, 16, 33, 0, 247])
-            # Live mode
-            self.midi_out.send_message([240, 0, 32, 41, 2, 13, 14, 0, 247])
-            # Session layout
-            self.midi_out.send_message([240, 0, 32, 41, 2, 13, 0, 0, 247])
+            # Programmer mode
+            self.midi_out.send_message([240, 0, 32, 41, 2, 13, 14, 1, 247])
             self.encode_color = encode_color3
+        else:
+            self.midi_in = rtmidi.MidiIn().open_port(ins[0])
+            self.midi_out = rtmidi.MidiOut().open_port(outs[0])
+            self.encode_color = encode_color
 
     def close(self):
         if self.midi_in:
