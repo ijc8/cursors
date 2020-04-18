@@ -153,7 +153,7 @@ def trigger(state, cursor, pos):
 
 # TODO: match plot colors with launchpad colors
 effectors = [
-    Effector("note", trigger, (1, 0, 0), (0, 1)),
+    Effector("note", trigger, (1, 0, 0), (0, 2)),
     Effector("reverse", reverse, (0, 1, 0), (3, 2)),
     Effector("split", split, (0, 0, 1), (3, 0)),
     Effector("merge", merge, (0, 0, 1), (1, 0)),

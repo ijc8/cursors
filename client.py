@@ -36,13 +36,15 @@ def render(state, modifiers, start_col):
         if start_col <= c < start_col + 8:
             value = state.grid[r, c]
             if show_all or modifiers[value - 1]:
-                g[r, c - start_col] = cursors.effectors[value - 1].lc_color
+                g[r, c - start_col] += cursors.effectors[value - 1].lc_color
 
     # Set column button colors to match the effectors they select.
     for i, effector in enumerate(cursors.effectors):
         if not modifiers[i]:
             # Feedback: when select button is pressed, light turns off.
             g[i, 8] = effector.lc_color
+
+    g = np.clip(g, 0, 3)
 
     return g.swapaxes(0, 1)
 
