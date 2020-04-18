@@ -47,9 +47,10 @@ class GameState:
     def reset_cursors(self):
         self.cursors = [copy.copy(proto_cursor)]
 
-    def get_warps(self):
-        # TODO convenient way to go from effector name to id
-        return list(np.unique(np.where(self.grid == 5)[1]))
+    def get_warps(self, start_row, end_row):
+        "Get all the warps in the rows [start_row, end_row). Returns columns of valid warps."
+        # TODO convenient way to go from effector name to id - avoid magic numbers.
+        return list(np.unique(np.where(self.grid[start_row:end_row] == 5)[1]))
 
     def update(self, dt):
         visited = set()
@@ -140,7 +141,7 @@ def merge(state, cursor, _):
 
 
 def warp(state, cursor, pos):
-    warps = state.get_warps()
+    warps = state.get_warps(cursor.start, cursor.start + cursor.height)
     dir = 1 if cursor.speed > 0 else -1
     # Add difference (rather than setting directly) to preserve fractional position:
     cursor.pos += warps[(warps.index(pos[1]) + dir) % len(warps)] - pos[1]
