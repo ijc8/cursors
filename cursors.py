@@ -142,7 +142,8 @@ def merge(state, cursor, _):
 def warp(state, cursor, pos):
     warps = state.get_warps()
     dir = 1 if cursor.speed > 0 else -1
-    cursor.pos = warps[(warps.index(pos[1]) + dir) % len(warps)]
+    # Add difference (rather than setting directly) to preserve fractional position:
+    cursor.pos += warps[(warps.index(pos[1]) + dir) % len(warps)] - pos[1]
 
 
 def trigger(state, cursor, pos):
