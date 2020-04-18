@@ -7,6 +7,7 @@ import time
 
 import numpy as np
 import matplotlib
+import matplotlib.animation
 import matplotlib.pyplot as plt
 
 import cursors
@@ -63,24 +64,26 @@ def run():
     selected_effector = cursors.effectors[0]
 
     matplotlib.rcParams["toolbar"] = "None"
-    plt.ion()
     fig, ax = plt.subplots(figsize=tuple(s // 2 for s in state.grid.shape[::-1]))
+    running = True
+
+    def on_close(event):
+        nonlocal running
+        running = False
+        fig.canvas.stop_event_loop()
 
     def on_click(event):
         if event.xdata is None or event.ydata is None:
             return
         x = int(round(event.xdata))
         y = int(round(event.ydata))
-        print(x, y)
         state.grid[y, x] = cursors.effectors.index(selected_effector) + 1
-        # g = render(grid, cursors)
-        # im.set_data(g)
 
     keymap = {
         "n": cursors.effectors[0],
         "r": cursors.effectors[1],
         "s": cursors.effectors[2],
-        "m": cursors.effectors[3],  # or 'join'?
+        "m": cursors.effectors[3],
         "w": cursors.effectors[4],
     }
 
@@ -95,8 +98,9 @@ def run():
         selected_effector = keymap[event.key]
         ax.set_xlabel(selected_effector.name)
 
-    cid = fig.canvas.mpl_connect("button_press_event", on_click)
-    cid = fig.canvas.mpl_connect("key_press_event", on_keypress)
+    fig.canvas.mpl_connect("close_event", on_close)
+    fig.canvas.mpl_connect("button_press_event", on_click)
+    fig.canvas.mpl_connect("key_press_event", on_keypress)
 
     def plt_render(state):
         # Render the state to an RGB image.
@@ -134,9 +138,9 @@ def run():
     ### END PLT STUFF
 
     last = time.time()
-    # last_frame = np.zeros((8, 8, 2))
 
-    while True:
+    def update(frame):
+        nonlocal last
         now = time.time()
         events = state.update(now - last)
         last = now
@@ -157,14 +161,16 @@ def run():
         if data:
             for client in clients:
                 client.send(bytes(data + "\n", "utf8"))
-        # last_frame = frame
 
-        plt.pause(0.0001)
+    ani = matplotlib.animation.FuncAnimation(fig, update)
 
-
-def serve():
-    with ThreadedTCPServer(("0.0.0.0", 8765), MyTCPHandler) as server:
-        server.serve_forever()
+    try:
+        fig.show()
+        # TODO: is there a less ridiculous way to ensure that the GUI event loop is really in this thread?
+        fig.canvas.stop_event_loop()
+        fig.canvas.start_event_loop()
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == '__main__':
@@ -172,6 +178,8 @@ if __name__ == '__main__':
         exit('usage: server.py <number of players>')
     state = cursors.GameState(int(sys.argv[1]))
     clients = set()
-    serve_thread = threading.Thread(target=serve)
-    serve_thread.start()
-    run()
+    with ThreadedTCPServer(("0.0.0.0", 8765), MyTCPHandler) as server:
+        serve_thread = threading.Thread(target=server.serve_forever)
+        serve_thread.start()
+        run()
+        server.shutdown()

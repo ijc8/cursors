@@ -149,6 +149,7 @@ def trigger(state, cursor, pos):
     pass  # doesn't modify game state
 
 
+# TODO: match plot colors with launchpad colors
 effectors = [
     Effector("note", trigger, (1, 0, 0), (0, 1)),
     Effector("reverse", reverse, (0, 1, 0), (3, 2)),
