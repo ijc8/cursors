@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 import time
 import copy
 
+
+def lp_to_rgb(color):
+    return (color[0] / 3, color[1] / 3, 0)
+
+
 # Each cursor consists of a row, a height, a speed, and a position (column). ... and merge direction
 # The first three things are fixed-ish, the last changes all the time.
 # In particular, the last is a float which is rounded down for rendering and checking.
@@ -19,6 +24,8 @@ class Cursor:
         self.speed = speed
         self.pos = pos
         self.merge_direction = merge_direction
+        self.color = [1, 1]
+        self.rgb_color = lp_to_rgb(self.color)
 
     def dump(self):
         return [self.start, self.height, self.speed, self.pos, self.merge_direction]
@@ -82,11 +89,12 @@ class GameState:
 
 
 class Effector:
-    def __init__(self, name, function, color, lc_color):
+    def __init__(self, name, function, color):
+        # NOTE: color is a launchpad mk2 color (r, g), where r and g are in [0, 3].
         self.name = name
         self.function = function
         self.color = color
-        self.lc_color = lc_color
+        self.rgb_color = lp_to_rgb(color)
 
 
 def reverse(state, cursor, _):
@@ -147,15 +155,27 @@ def warp(state, cursor, pos):
     cursor.pos += warps[(warps.index(pos[1]) + dir) % len(warps)] - pos[1]
 
 
+def speedup(state, cursor, pos):
+    cursor.speed *= 2
+    state.grid[pos] = 0  # self-destruct
+
+
+def slowdown(state, cursor, pos):
+    cursor.speed /= 2
+    state.grid[pos] = 0  # self-destruct
+
+
 def trigger(state, cursor, pos):
     pass  # doesn't modify game state
 
 
-# TODO: match plot colors with launchpad colors
+# TODO: reconsider colors and ordering
 effectors = [
-    Effector("note", trigger, (1, 0, 0), (0, 2)),
-    Effector("reverse", reverse, (0, 1, 0), (3, 2)),
-    Effector("split", split, (0, 0, 1), (3, 0)),
-    Effector("merge", merge, (0, 0, 1), (1, 0)),
-    Effector("warp", warp, (1, 1, 0), (2, 3))
+    Effector("note", trigger, (0, 1)),
+    Effector("reverse", reverse, (3, 2)),
+    Effector("split", split, (3, 0)),
+    Effector("merge", merge, (1, 0)),
+    Effector("warp", warp, (2, 3)),
+    Effector("speedup", speedup, (0, 3)),
+    Effector("slowdown", slowdown, (1, 2)),
 ]

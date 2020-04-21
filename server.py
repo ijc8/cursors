@@ -106,16 +106,10 @@ def run():
         # Render the state to an RGB image.
         g = np.ones(state.grid.shape + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
         for cursor in state.cursors:
-            middle = (cursor.start + (cursor.start + cursor.height)) / 2
-            level = (middle - 0.5) / (state.grid.shape[0] - 1)
-            g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = [
-                level,
-                0,
-                1 - level,
-            ]
+            g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = cursor.rgb_color
         for r, c in zip(*state.grid.nonzero()):
             value = state.grid[r, c]
-            g[r, c] = cursors.effectors[value - 1].color
+            g[r, c] = cursors.effectors[value - 1].rgb_color
         return g
 
     ax.tick_params(

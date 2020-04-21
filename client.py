@@ -21,9 +21,7 @@ def render(state, modifiers, start_col):
     for cursor in state.cursors:
         # TODO adjust bounds for each player's client
         if start_col <= cursor.pos < start_col + 8:
-            middle = (cursor.start + (cursor.start + cursor.height)) / 2
-            level = (middle - 0.5) / (state.grid.shape[0] - 1)
-            g[cursor.start: cursor.start + cursor.height, int(cursor.pos) - start_col] = [1, 1]
+            g[cursor.start: cursor.start + cursor.height, int(cursor.pos) - start_col] = cursor.color
 
     # Uncomment to examine the Launchpad's palette:
     # for r in range(4):
@@ -36,13 +34,13 @@ def render(state, modifiers, start_col):
         if start_col <= c < start_col + 8:
             value = state.grid[r, c]
             if show_all or modifiers[value - 1]:
-                g[r, c - start_col] += cursors.effectors[value - 1].lc_color
+                g[r, c - start_col] += cursors.effectors[value - 1].color
 
     # Set column button colors to match the effectors they select.
     for i, effector in enumerate(cursors.effectors):
         if not modifiers[i]:
             # Feedback: when select button is pressed, light turns off.
-            g[i, 8] = effector.lc_color
+            g[i, 8] = effector.color
 
     g = np.clip(g, 0, 3)
 
