@@ -28,7 +28,7 @@ def render(state, modifiers, start_col):
     #     for y in range(4):
     #         g[r, y] = [r, y]
 
-    show_all = not any(modifiers)
+    show_all = not any(modifiers[:len(cursors.effectors)])
     for r, c in zip(*state.grid.nonzero()):
         # TODO adjust bounds for each player's client
         if start_col <= c < start_col + 8:
