@@ -30,6 +30,10 @@ class Cursor:
     def dump(self):
         return [self.start, self.height, self.speed, self.pos, self.merge_direction]
 
+    def get_frac_pos(self):
+        "Compute how far this cursor is past the nearest column division."
+        return self.pos - np.floor(self.pos) if self.speed > 0 else np.ceil(self.pos) - self.pos
+
     def __repr__(self):
         return f"Cursor(start={self.start}, height={self.height}, speed={self.speed}, pos={self.pos}, merge_direction={self.merge_direction})"
 
@@ -60,6 +64,7 @@ class GameState:
         return list(np.unique(np.where(self.grid[start_row:end_row] == 5)[1]))
 
     def update(self, dt):
+        # print('dt', dt)
         visited = set()
         events = []
         for cursor in self.cursors[:]:
@@ -69,22 +74,28 @@ class GameState:
             cursor.pos += cursor.speed * dt
             cursor.pos %= self.grid.shape[1]
             new_pos = int(cursor.pos)
-            if new_pos != old_pos:
-                hits = self.grid[
-                    cursor.start : cursor.start + cursor.height, new_pos
-                ].nonzero()[0]
-                for hit in hits:
-                    pos = (cursor.start + hit, new_pos)
-                    if pos in visited:
-                        print(
-                            f"aha, we already hit this effector ({pos}) this round; skipping to avoid merge issue."
-                        )
-                        continue
-                    visited.add(pos)
-                    effector = effectors[self.grid[pos[0], pos[1]] - 1]
-                    print(f"we hit {effector.name} at {pos}!")
-                    events.append([effector.name, *pos, cursor.height, cursor.speed])
-                    effector.function(self, cursor, pos)
+            if new_pos == old_pos:
+                # Nothing new, move on.
+                continue
+            frac_pos = cursor.get_frac_pos()
+            # Get the precise moment when this cursor hit this column, as an offset from 'now'.
+            time_offset = -abs(frac_pos / cursor.speed)
+            # print('to', time_offset)
+            hits = self.grid[
+                cursor.start : cursor.start + cursor.height, new_pos
+            ].nonzero()[0]
+            for hit in hits:
+                pos = (cursor.start + hit, new_pos)
+                if pos in visited:
+                    print(
+                        f"aha, we already hit this effector ({pos}) this round; skipping to avoid merge issue."
+                    )
+                    continue
+                visited.add(pos)
+                effector = effectors[self.grid[pos[0], pos[1]] - 1]
+                print(f"we hit {effector.name} at {pos}!")
+                events.append([effector.name, *pos, cursor.height, cursor.speed, time_offset])
+                effector.function(self, cursor, pos)
         return events
 
 
@@ -98,11 +109,10 @@ class Effector:
 
 
 def reverse(state, cursor, _):
+    gap = cursor.get_frac_pos()
     if cursor.speed > 0:
-        gap = cursor.pos - np.floor(cursor.pos)
         cursor.pos = np.floor(cursor.pos) + (1 - gap)
     else:
-        gap = np.ceil(cursor.pos) - cursor.pos
         cursor.pos = np.ceil(cursor.pos) - (1 - gap)
     cursor.speed *= -1
 

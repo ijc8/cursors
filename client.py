@@ -5,6 +5,7 @@ import select
 import sys
 import cursors
 import json
+import time
 from oscpy.client import OSCClient
 
 
@@ -54,6 +55,9 @@ class CursorClient:
         self.mirror_state = cursors.GameState()
         self.modifiers = [False] * 8
         self.selected_effector = 1
+        self.server_timestamp = None
+        # TODO: decrease max frac_pos/time_offset on server side, and lower this.
+        self.packet_jitter_buffer = 0.25  # 250 ms
 
     def open(self, host):
         self.lp.open()
@@ -97,9 +101,23 @@ class CursorClient:
             rs, _, _ = select.select([self.socket], [], [], 0)
             if not rs:
                 break
-            #c = self.socket.recv(1)
             # TODO: optimize over-the-wire format as necessary
             data = json.loads(self.sockf.readline())
+            timestamp = data['timestamp']
+            now = time.time()
+            if self.server_timestamp is None:
+                self.client_timestamp = now + self.packet_jitter_buffer
+                self.server_timestamp = timestamp
+            old = self.client_timestamp
+            self.client_timestamp += timestamp - self.server_timestamp
+            self.server_timestamp = timestamp
+            # print('server', timestamp, self.server_timestamp, timestamp - self.server_timestamp)
+            delay = self.client_timestamp - now
+            # print('client', old, self.client_timestamp, now, delay)
+            if delay < 0:
+                print(f'late by {-delay}. jitter exceeded {self.packet_jitter_buffer} seconds')
+                delay = 0
+
             self.mirror_state.grid = np.zeros(
                 self.mirror_state.grid.shape, dtype=np.int)
             self.mirror_state.cursors = [
@@ -108,9 +126,12 @@ class CursorClient:
                 self.mirror_state.grid[x, y] = value
             for event in data.get('events', []):
                 print(f'Event: {event}')
-                # TODO: figure out timing for Max playback
                 event[0] = event[0].encode('utf8')
+                # Fractional event timing offset + jitter-prevention delay = Patch triggering delay
+                # TODO: consider using this for lp display as well, to smooth frac_pos/dt-related jitter.
+                event[-1] += delay
                 self.client.send_message(b'/cursors', event)
+                print(event)
 
     def run(self):
         while True:

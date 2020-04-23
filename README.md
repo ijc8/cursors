@@ -17,4 +17,4 @@ instrument for FaMLE
     python client.py localhost 0  # 0 = your player number
 
 Currently, OSC messages are sent to `localhost:8000` on `/cursors`.
-The contents of the messages are effector type (string), x, y, cursor size, cursor speed (all ints)
+The contents of the messages are effector type (string), x, y, cursor size, cursor speed (all ints), delay time (float)

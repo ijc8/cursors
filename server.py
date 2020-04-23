@@ -151,8 +151,9 @@ def run():
             data["grid"] = grid_info
         if events:
             data["events"] = events
-        data = json.dumps(data, cls=NumpyEncoder)
         if data:
+            data["timestamp"] = now
+            data = json.dumps(data, cls=NumpyEncoder)
             for client in clients:
                 client.send(bytes(data + "\n", "utf8"))
 
