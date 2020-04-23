@@ -93,7 +93,11 @@ class CursorClient:
                 if self.selected_effector > len(cursors.effectors):
                     self.selected_effector = 0
         elif event[1]:
-            data = encode_bytes(self.player_id, pos, self.selected_effector)
+            effector = self.selected_effector
+            # Behave as a toggle, if the selected effector is already present at that location.
+            if self.mirror_state.grid[pos[::-1]] == self.selected_effector:
+                effector = 0
+            data = encode_bytes(self.player_id, pos, effector)
             self.socket.send(data)
 
     def poll_server(self):
