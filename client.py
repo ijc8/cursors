@@ -146,6 +146,7 @@ class CursorClient:
                 self.handle_input(event)
 
             self.update_frame()
+            time.sleep(1/60)
 
 
 if __name__ == '__main__':
