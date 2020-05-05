@@ -42,7 +42,7 @@ proto_cursor = Cursor(0, 8, 3, 0, 1)
 
 
 class GameState:
-    def __init__(self, n=2):
+    def __init__(self, n=7):
         """Setup the game state.
 
         n is the number of consecutive square grids (probably equal to the number of players).
