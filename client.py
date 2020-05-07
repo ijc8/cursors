@@ -52,7 +52,7 @@ class CursorClient:
     def __init__(self, player_id):
         self.player_id = player_id
         self.lp = launchpad.Launchpad()
-        self.mirror_state = cursors.GameState()
+        self.mirror_state = None
         self.modifiers = [False] * 8
         self.selected_effector = 1
         self.server_timestamp = None
@@ -65,6 +65,9 @@ class CursorClient:
         self.frame = np.zeros((9, 8, 2))
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, 8765))
+        num_players = self.socket.recv(1)[0]
+        self.mirror_state = cursors.GameState(num_players)
+
         self.sockf = self.socket.makefile('r')
         self.client = OSCClient('127.0.0.1', 8000)
 

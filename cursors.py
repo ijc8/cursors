@@ -38,13 +38,14 @@ proto_cursor = Cursor(0, 8, 3, 0, 1)
 
 
 class GameState:
-    def __init__(self, n=7):
+    def __init__(self, num_squares):
         """Setup the game state.
 
-        n is the number of consecutive square grids (probably equal to the number of players).
+        num_squares is the number of consecutive square grids (probably equal to the number of players).
         """
+        self.num_squares = num_squares
         self.cursors = [copy.copy(proto_cursor)]
-        shape = (8, n * 8)
+        shape = (8, num_squares * 8)
         # MxN playing field of different effects & triggers.
         # TODO: Will each element be a bitmask of things at that location?
         # Seem like no, if effectors have their own parameters (lifespan, maybe destination for warps)

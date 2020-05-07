@@ -16,6 +16,7 @@ import cursors
 class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         clients.add(self.request)
+        self.request.send(bytes([state.num_squares]))
         print(f"-> {self.client_address[0]} connected")
 
         try:
@@ -155,7 +156,10 @@ def run():
             data["timestamp"] = now
             data = json.dumps(data, cls=NumpyEncoder)
             for client in clients:
-                client.send(bytes(data + "\n", "utf8"))
+                try:
+                    client.send(bytes(data + "\n", "utf8"))
+                except OSError:
+                    pass
 
     ani = matplotlib.animation.FuncAnimation(fig, update)
 
