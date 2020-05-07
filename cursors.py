@@ -34,7 +34,7 @@ class Cursor:
         return f"Cursor(start={self.start}, height={self.height}, speed={self.speed}, pos={self.pos}, merge_direction={self.merge_direction})"
 
 
-proto_cursor = Cursor(0, 8, 3, 0, 1)
+proto_cursor = Cursor(0, 8, 4, 0, 1)
 
 
 class GameState:
@@ -163,12 +163,14 @@ def warp(state, cursor, pos):
 
 
 def speedup(state, cursor, pos):
-    cursor.speed *= 2
+    if abs(cursor.speed) < 16:
+        cursor.speed *= 2
     state.grid[pos] = 0  # self-destruct
 
 
 def slowdown(state, cursor, pos):
-    cursor.speed /= 2
+    if abs(cursor.speed) > 0.5:
+        cursor.speed /= 2
     state.grid[pos] = 0  # self-destruct
 
 

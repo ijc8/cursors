@@ -130,7 +130,7 @@ def run():
     r = (np.arange(state.grid.shape[0] + 1) + hole_radius)[::-1]
     theta = np.linspace(0, 2*np.pi, state.grid.shape[1] + 1)
 
-    im = ax.pcolormesh(theta, r, plt_render(state).sum(axis=-1))
+    im = ax.pcolormesh(theta, r, plt_render(state).sum(axis=-1)[:, ::-1])
 
     # Setting xticks mysteriously misses some points.
     ax.vlines(theta, hole_radius, r[0], color='w', linewidth=3)
@@ -144,7 +144,7 @@ def run():
 
     def update_display(frame):
         g = plt_render(state)
-        im.set_array(g.sum(axis=-1).ravel())
+        im.set_array(g.sum(axis=-1)[:, ::-1].ravel())
 
     ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/30)
     ### END PLT STUFF
@@ -175,7 +175,7 @@ def run():
                 data["cursors"] = [c.dump() for c in state.cursors]
                 data["timestamp"] = now
                 data = json.dumps(data, cls=NumpyEncoder)
-                for client in clients:
+                for client in clients.copy():
                     try:
                         client.send(bytes(data + "\n", "utf8"))
                     except OSError:
