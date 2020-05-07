@@ -108,7 +108,8 @@ class CursorClient:
         elif event[1]:
             effector = self.selected_effector
             # Behave as a toggle, if the selected effector is already present at that location.
-            if self.mirror_state.grid[pos[::-1]] == self.selected_effector:
+            global_pos = (pos[0] + self.player_id * 8, pos[1])
+            if self.mirror_state.grid[global_pos[::-1]] == self.selected_effector:
                 effector = 0
             data = encode_bytes(self.player_id, pos, effector)
             self.socket.send(data)
