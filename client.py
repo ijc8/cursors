@@ -55,6 +55,7 @@ class CursorClient:
         self.mirror_state = None
         self.modifiers = [False] * 8
         self.selected_effector = 1
+        self.client_timestamp = None
         self.server_timestamp = None
         # TODO: decrease max frac_pos/time_offset on server side, and lower this.
         self.packet_jitter_buffer = 0.25  # 250 ms
@@ -79,6 +80,12 @@ class CursorClient:
         self.lp.close()
 
     def update_frame(self):
+        if self.client_timestamp is not None:
+            t = time.time()
+            # Interpolate cursor positions between updates
+            for cursor in self.mirror_state.cursors:
+                cursor.pos = (cursor.recv_pos + cursor.speed * (t - self.client_timestamp)) % self.mirror_state.grid.shape[1]
+
         self.next_frame = render(self.mirror_state, self.modifiers, self.player_id * 8)
         r = np.where(self.next_frame != self.frame)
         xs, ys, _ = r
@@ -128,12 +135,16 @@ class CursorClient:
                 print(f'late by {-delay}. jitter exceeded {self.packet_jitter_buffer} seconds')
                 delay = 0
 
-            self.mirror_state.grid = np.zeros(
-                self.mirror_state.grid.shape, dtype=np.int)
             self.mirror_state.cursors = [
                 cursors.Cursor(*d) for d in data['cursors']]
-            for x, y, value in data.get('grid', []):
-                self.mirror_state.grid[x, y] = value
+            # Kind of a hack:
+            for cursor in self.mirror_state.cursors:
+                cursor.recv_pos = cursor.pos
+            if 'grid' in data:
+                self.mirror_state.grid = np.zeros(
+                    self.mirror_state.grid.shape, dtype=np.int)
+                for x, y, value in data.get('grid', []):
+                    self.mirror_state.grid[x, y] = value
             for event in data.get('events', []):
                 print(f'Event: {event}')
                 event[0] = event[0].encode('utf8')

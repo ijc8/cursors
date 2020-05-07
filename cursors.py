@@ -67,6 +67,7 @@ class GameState:
             old_pos = int(cursor.pos)
             # NOTE: This does not handle the case where dt is so large that multiple steps have passed.
             # If dt is too large, cursors will 'teleport' to their new position, skipping any effectors in between.
+            # This can dealt with higher up by making sure dt is never larger than the highest cursor speed.
             cursor.pos += cursor.speed * dt
             cursor.pos %= self.grid.shape[1]
             new_pos = int(cursor.pos)

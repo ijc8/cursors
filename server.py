@@ -133,46 +133,52 @@ def run():
     for edge, spine in ax.spines.items():
         spine.set_visible(False)
     im = ax.imshow(state.grid[:, :])
-    ### END PLT STUFF
 
-    last = time.time()
-
-    def update(frame):
-        nonlocal last
-        now = time.time()
-        events = state.update(now - last)
-        last = now
-
+    def update_display(frame):
         g = plt_render(state)
         im.set_data(g)
 
-        points = np.array(state.grid.nonzero()).T
-        grid_info = []
-        for p in points:
-            grid_info.append([*p, state.grid[(*p,)]])
-        data = {"cursors": [c.dump() for c in state.cursors]}
-        if grid_info:
-            data["grid"] = grid_info
-        if events:
-            data["events"] = events
-        if data:
-            data["timestamp"] = now
-            data = json.dumps(data, cls=NumpyEncoder)
-            for client in clients:
-                try:
-                    client.send(bytes(data + "\n", "utf8"))
-                except OSError:
-                    pass
+    ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/30)
+    ### END PLT STUFF
 
-    ani = matplotlib.animation.FuncAnimation(fig, update)
+    running = True
 
-    try:
-        fig.show()
-        # TODO: is there a less ridiculous way to ensure that the GUI event loop is really in this thread?
-        fig.canvas.stop_event_loop()
-        fig.canvas.start_event_loop()
-    except KeyboardInterrupt:
-        pass
+    def update_state():
+        last = time.time()
+        last_grid_info = []
+        while running:
+            now = time.time()
+            events = state.update(now - last)
+            last = now
+
+            points = np.array(state.grid.nonzero()).T
+            grid_info = []
+            for p in points:
+                grid_info.append([*p, state.grid[(*p,)]])
+            data = {}
+            if grid_info != last_grid_info:
+                data["grid"] = grid_info
+                last_grid_info = grid_info
+            if events:
+                data["events"] = events
+            if data:
+                # Only send cursor updates if something else of interest has occurred.
+                # Assumes the client will interpolate motion based on cursor speed in the meantime.
+                data["cursors"] = [c.dump() for c in state.cursors]
+                data["timestamp"] = now
+                data = json.dumps(data, cls=NumpyEncoder)
+                for client in clients:
+                    try:
+                        client.send(bytes(data + "\n", "utf8"))
+                    except OSError:
+                        pass
+            time.sleep(1/60)
+
+    t = threading.Thread(target=update_state)
+    t.start()
+
+    plt.show(block=True)
+    running = False
 
 
 if __name__ == '__main__':
