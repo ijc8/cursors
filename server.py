@@ -7,20 +7,27 @@ import time
 
 import numpy as np
 import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.animation
 import matplotlib.pyplot as plt
 
 import cursors
 
+def get_unused_player_id():
+    ids = {id for id, sock in clients}
+    pool = set(range(len(ids) + 1))
+    return sorted(pool - ids)[0]
+
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         print(f"-> {self.client_address[0]} connected")
-        self.request.send(bytes([state.num_squares, len(clients)]))
+        player_id = get_unused_player_id()
+        self.request.send(bytes([state.num_squares, player_id]))
         if len(clients) >= state.num_squares:
             print(f"no room, closing connection")
             return
-        clients.add(self.request)
+        clients.add((player_id, self.request))
 
         try:
             while True:
@@ -35,7 +42,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         except ConnectionResetError:
             pass
 
-        clients.remove(self.request)
+        clients.remove((player_id, self.request))
         print(f"<- {self.client_address[0]} disconnected")
 
 
@@ -149,8 +156,6 @@ def run():
     ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/30)
     ### END PLT STUFF
 
-    running = True
-
     def update_state():
         last = time.time()
         last_grid_info = []
@@ -175,9 +180,9 @@ def run():
                 data["cursors"] = [c.dump() for c in state.cursors]
                 data["timestamp"] = now
                 data = json.dumps(data, cls=NumpyEncoder)
-                for client in clients.copy():
+                for id, sock in clients.copy():
                     try:
-                        client.send(bytes(data + "\n", "utf8"))
+                        sock.send(bytes(data + "\n", "utf8"))
                     except OSError:
                         pass
             time.sleep(1/60)
