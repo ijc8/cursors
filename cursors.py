@@ -61,48 +61,57 @@ class GameState:
         return list(np.unique(np.where(self.grid[start_row:end_row] == 5)[1]))
 
     def update(self, dt):
-        # print('dt', dt)
-        visited = set()
-        events = []
-        for cursor in self.cursors[:]:
+        queue = []
+        # First, update cursor positions and add ones that entered a new column to the queue.
+        for cursor in self.cursors:
             old_pos = int(cursor.pos)
             # NOTE: This does not handle the case where dt is so large that multiple steps have passed.
             # If dt is too large, cursors will 'teleport' to their new position, skipping any effectors in between.
             cursor.pos += cursor.speed * dt
             cursor.pos %= self.grid.shape[1]
             new_pos = int(cursor.pos)
-            if new_pos == old_pos:
-                # Nothing new, move on.
+            if new_pos != old_pos:
+                queue.append(cursor)
+
+        events = []
+        visited = set()
+        # Then run events. Note that effectors may cause the queue to grow while we're processing it.
+        while queue:
+            cursor = queue.pop()
+            if cursor not in self.cursors:
                 continue
+            new_pos = int(cursor.pos)
             frac_pos = cursor.get_frac_pos()
             # Get the precise moment when this cursor hit this column, as an offset from 'now'.
             time_offset = -abs(frac_pos / cursor.speed)
-            # print('to', time_offset)
             hits = self.grid[
                 cursor.start : cursor.start + cursor.height, new_pos
             ].nonzero()[0]
-            for hit in hits:
-                pos = (cursor.start + hit, new_pos)
+            hits = [((cursor.start + hit, new_pos), effectors[self.grid[cursor.start + hit, new_pos] - 1]) for hit in hits]
+            hits.sort(key=lambda p: p[1].order)
+            for pos, effector in hits:
                 if pos in visited:
-                    print(
-                        f"aha, we already hit this effector ({pos}) this round; skipping to avoid merge issue."
-                    )
+                    # Already used this effector on an earlier cursor (pre-split)
                     continue
                 visited.add(pos)
-                effector = effectors[self.grid[pos[0], pos[1]] - 1]
                 print(f"we hit {effector.name} at {pos}!")
                 events.append([effector.name, *pos, cursor.height, cursor.speed, time_offset])
-                effector.function(self, cursor, pos)
+                enqueued = effector.function(self, cursor, pos)
+                if enqueued is not None:
+                    # Effector manipulated the queue; stop processing this cursor.
+                    queue += enqueued
+                    break
         return events
 
 
 class Effector:
-    def __init__(self, name, function, color):
+    def __init__(self, name, function, color, order=0):
         # NOTE: color is a launchpad mk2 color (r, g), where r and g are in [0, 3].
         self.name = name
         self.function = function
         self.color = color
         self.rgb_color = lp_to_rgb(color)
+        self.order = order
 
 
 def reverse(state, cursor, _):
@@ -117,42 +126,32 @@ def reverse(state, cursor, _):
 def split(state, cursor, pos):
     if pos[0] == cursor.start:
         return  # can't split at the top. (think about it)
-    # TODO: perhaps pass in cursor index instead of the cursor itself?
     ind = state.cursors.index(cursor)
     top = Cursor(cursor.start, pos[0] - cursor.start, cursor.speed, cursor.pos, 1)
-    bottom = Cursor(
-        pos[0], cursor.start + cursor.height - pos[0], cursor.speed, cursor.pos, -1
-    )
+    bottom = Cursor(pos[0], cursor.start + cursor.height - pos[0], cursor.speed, cursor.pos, -1)
     state.cursors[ind] = top
     state.cursors.insert(ind + 1, bottom)
+    # Add children to queue.
+    return [top, bottom]
 
 
 def merge(state, cursor, _):
-    # Special case: if there's only one cursor, don't delete it.
-    if len(state.cursors) == 1:
-        return
-
     ind = state.cursors.index(cursor)
-    print("old", state.cursors)
-    print("merge", ind, cursor.merge_direction)
-    if cursor.merge_direction == -1:
-        if ind > 0:
-            print("with", ind - 1)
-            state.cursors[ind - 1].height += cursor.height
-        print("delete")
+    if ind > 0 and (cursor.merge_direction < 0 or ind == len(state.cursors) - 1):
+        # Merge upwards
+        state.cursors[ind - 1].height += cursor.height
         del state.cursors[ind]
-    elif cursor.merge_direction == 1:
-        # Tricky issue: newly extended cursor will be processed after this one, and may register a hit on the same merge node!
-        # How to avoid double-merging? One easy answer is that merge nodes disappear after use, but this is unsatisfactory.
-        # Given how our system works, only one cursor should be on a row at a time - for it should never be the case that two cursors
-        # both hit the same effector in one round. In which case, maybe the easiest thing to do is avoid activating any node twice.
-        if ind < len(state.cursors) - 1:
-            print("with", ind + 1)
-            state.cursors[ind + 1].start = cursor.start
-            state.cursors[ind + 1].height += cursor.height
-        print("delete")
+        # Re-process parent in case it should hit any other merge effectors with its new height.
+        # return [state.cursors[ind - 1]]
+        return []
+    elif ind < len(state.cursors) - 1 and (cursor.merge_direction > 0 or ind == 0):
+        # Merge downwards
+        state.cursors[ind + 1].start = cursor.start
+        state.cursors[ind + 1].height += cursor.height
         del state.cursors[ind]
-    print("new", state.cursors)
+        # Re-process parent in case it should hit any other merge effectors with its new height.
+        # return [state.cursors[ind]]
+        return []
 
 
 def warp(state, cursor, pos):
@@ -172,7 +171,7 @@ def slowdown(state, cursor, pos):
     state.grid[pos] = 0  # self-destruct
 
 
-def trigger(state, cursor, pos):
+def trigger(*_):
     pass  # doesn't modify game state
 
 
@@ -180,8 +179,13 @@ def trigger(state, cursor, pos):
 effectors = [
     Effector("note", trigger, (0, 1)),
     Effector("reverse", reverse, (3, 2)),
-    Effector("split", split, (3, 0)),
-    Effector("merge", merge, (1, 0)),
+    # Note that split is applied after all effects (except merge)
+    # This is to avoid bizarre behaviors and asymmetry that arise otherwise.
+    # For example, if a cursor hits split and speedup at the same instant,
+    # both of the child cursors get the speedup (as opposed to just one or neither).
+    Effector("split", split, (3, 0), order=1),
+    # Merge is applied after all other effects
+    Effector("merge", merge, (1, 0), order=2),
     Effector("warp", warp, (2, 3)),
     Effector("speedup", speedup, (0, 3)),
     Effector("slowdown", slowdown, (1, 2)),
