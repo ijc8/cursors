@@ -49,8 +49,8 @@ def render(state, modifiers, start_col):
 
 
 class CursorClient:
-    def __init__(self, player_id):
-        self.player_id = player_id
+    def __init__(self):
+        self.player_id = None
         self.lp = launchpad.Launchpad()
         self.mirror_state = None
         self.modifiers = [False] * 8
@@ -65,7 +65,10 @@ class CursorClient:
         self.frame = np.zeros((9, 8, 2))
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, 8765))
-        num_players = self.socket.recv(1)[0]
+        num_players, self.player_id = self.socket.recv(2)
+        if self.player_id >= num_players:
+            exit('Server full.')
+        print(f'You are player {self.player_id}.')
         self.mirror_state = cursors.GameState(num_players)
 
         self.sockf = self.socket.makefile('r')
@@ -154,9 +157,9 @@ class CursorClient:
 
 if __name__ == '__main__':
     # Eventually, we might want to assign player numbers automatically.
-    if len(sys.argv) < 3:
-        exit('usage: client.py <server address> <player number>')
-    c = CursorClient(int(sys.argv[2]))
+    if len(sys.argv) < 2:
+        exit('usage: client.py <server address>')
+    c = CursorClient()
     c.open(sys.argv[1])
     try:
         c.run()

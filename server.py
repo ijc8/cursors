@@ -15,9 +15,12 @@ import cursors
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        clients.add(self.request)
-        self.request.send(bytes([state.num_squares]))
         print(f"-> {self.client_address[0]} connected")
+        self.request.send(bytes([state.num_squares, len(clients)]))
+        if len(clients) >= state.num_squares:
+            print(f"no room, closing connection")
+            return
+        clients.add(self.request)
 
         try:
             while True:
