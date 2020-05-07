@@ -137,7 +137,13 @@ def run():
     r = (np.arange(state.grid.shape[0] + 1) + hole_radius)[::-1]
     theta = np.linspace(0, 2*np.pi, state.grid.shape[1] + 1)
 
-    im = ax.pcolormesh(theta, r, plt_render(state).sum(axis=-1)[:, ::-1])
+    image = plt_render(state)[:, ::-1, :]
+    raveled_pixel_shape = (image.shape[0]*image.shape[1], image.shape[2])
+    color_tuple = image.reshape(raveled_pixel_shape)
+
+    index = np.tile(np.arange(image.shape[0]), (image.shape[1],1))
+    im = ax.pcolormesh(theta, r, index.T, color=color_tuple, linewidth=0)
+    im.set_array(None)
 
     # Setting xticks mysteriously misses some points.
     ax.vlines(theta, hole_radius, r[0], color='w', linewidth=3)
@@ -150,8 +156,10 @@ def run():
         spine.set_visible(False)
 
     def update_display(frame):
-        g = plt_render(state)
-        im.set_array(g.sum(axis=-1)[:, ::-1].ravel())
+        image = plt_render(state)[:, ::-1, :]
+        raveled_pixel_shape = (image.shape[0]*image.shape[1], image.shape[2])
+        color_tuple = image.reshape(raveled_pixel_shape)
+        im.set_color(color_tuple)
 
     ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/30)
     ### END PLT STUFF
