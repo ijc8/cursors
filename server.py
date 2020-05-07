@@ -68,7 +68,7 @@ def run():
     selected_effector = cursors.effectors[0]
 
     matplotlib.rcParams["toolbar"] = "None"
-    fig, ax = plt.subplots(figsize=tuple(s // 2 for s in state.grid.shape[::-1]))
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
     running = True
 
     def on_close(event):
@@ -126,17 +126,25 @@ def run():
         left=False,
         labelleft=False,
     )
-    ax.set_xticks(np.arange(state.grid.shape[1] + 1) - 0.5, minor=True)
-    ax.set_yticks(np.arange(state.grid.shape[0] + 1) - 0.5, minor=True)
-    ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+    hole_radius = 4
+    r = (np.arange(state.grid.shape[0] + 1) + hole_radius)[::-1]
+    theta = np.linspace(0, 2*np.pi, state.grid.shape[1] + 1)
+
+    im = ax.pcolormesh(theta, r, plt_render(state).sum(axis=-1))
+
+    # Setting xticks mysteriously misses some points.
+    ax.vlines(theta, hole_radius, r[0], color='w', linewidth=3)
+    # Also, show divisions between squares:
+    ax.vlines(theta[::8], hole_radius, r[0], color='black', linewidth=3)
+    ax.set_rticks(r - 0.01, minor=True)
     ax.tick_params(which="minor", bottom=False, left=False)
+    ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
     for edge, spine in ax.spines.items():
         spine.set_visible(False)
-    im = ax.imshow(state.grid[:, :])
 
     def update_display(frame):
         g = plt_render(state)
-        im.set_data(g)
+        im.set_array(g.sum(axis=-1).ravel())
 
     ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/30)
     ### END PLT STUFF
