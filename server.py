@@ -76,6 +76,7 @@ def run():
 
     matplotlib.rcParams["toolbar"] = "None"
     fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+    plt.tight_layout()
     running = True
 
     def on_close(event):
@@ -116,8 +117,6 @@ def run():
     def plt_render(state):
         # Render the state to an RGB image.
         g = np.ones(state.grid.shape + (3,), dtype=np.float) * [0.6, 0.6, 0.6]
-        for cursor in state.cursors:
-            g[cursor.start : cursor.start + cursor.height, int(cursor.pos)] = cursor.rgb_color
         for r, c in zip(*state.grid.nonzero()):
             value = state.grid[r, c]
             g[r, c] = cursors.effectors[value - 1].rgb_color
@@ -133,8 +132,10 @@ def run():
         left=False,
         labelleft=False,
     )
-    hole_radius = 4
-    r = (np.arange(state.grid.shape[0] + 1) + hole_radius)[::-1]
+    hole_radius = 3
+    # r = (np.arange(state.grid.shape[0] + 1) + hole_radius)[::-1]
+    lo = 4
+    r = (np.geomspace(lo, state.grid.shape[0] + lo, num=state.grid.shape[0] + 1) - lo + hole_radius)[::-1]
     theta = np.linspace(0, 2*np.pi, state.grid.shape[1] + 1)
 
     image = plt_render(state)[:, ::-1, :]
@@ -145,21 +146,29 @@ def run():
     im = ax.pcolormesh(theta, r, index.T, color=color_tuple, linewidth=0)
     im.set_array(None)
 
+    bgcolor = '#29282b'
+    fig.patch.set_facecolor(bgcolor)
+    ax.set_facecolor("black")
     # Setting xticks mysteriously misses some points.
-    ax.vlines(theta, hole_radius, r[0], color='w', linewidth=3)
+    ax.vlines(theta, hole_radius, r[0], color=bgcolor, linewidth=3)
     # Also, show divisions between squares:
-    ax.vlines(theta[::8], hole_radius, r[0], color='black', linewidth=3)
+    ax.vlines(theta[::8], hole_radius, r[0], color='black', linewidth=5)
     ax.set_rticks(r - 0.01, minor=True)
     ax.tick_params(which="minor", bottom=False, left=False)
-    ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+    ax.grid(which="minor", color=bgcolor, linestyle="-", linewidth=3)
     for edge, spine in ax.spines.items():
         spine.set_visible(False)
+
+    lc = ax.vlines([], [], [], color=state.cursors[0].rgb_color, lw=4)
 
     def update_display(frame):
         image = plt_render(state)[:, ::-1, :]
         raveled_pixel_shape = (image.shape[0]*image.shape[1], image.shape[2])
         color_tuple = image.reshape(raveled_pixel_shape)
         im.set_color(color_tuple)
+        lines = np.array([[[-c.pos / state.grid.shape[1] * 2 * np.pi, 8 - c.start + hole_radius],
+                           [-c.pos / state.grid.shape[1] * 2 * np.pi, 8 - (c.start + c.height) + hole_radius]] for c in state.cursors])
+        lc.set_segments(lines)
 
     ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/30)
     ### END PLT STUFF

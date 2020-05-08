@@ -1,10 +1,15 @@
+import matplotlib.colors
 import numpy as np
 import time
 import copy
 
 
 def lp_to_rgb(color):
-    return (color[0] / 3, color[1] / 3, 0)
+    t = color[0] + color[1]
+    h = (color[1]/3 * .9) / t
+    s = np.sqrt(t / 6)
+    v = 0.5 + t / 12
+    return matplotlib.colors.hsv_to_rgb((h, s, v))
 
 
 # Each cursor consists of a row, a height, a speed, and a position (column). ... and merge direction
