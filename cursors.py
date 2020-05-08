@@ -30,6 +30,9 @@ class Cursor:
         "Compute how far this cursor is past the nearest column division."
         return self.pos - np.floor(self.pos) if self.speed > 0 else np.ceil(self.pos) - self.pos
 
+    def set_frac_pos(self, frac):
+        self.pos = np.floor(self.pos) + frac if self.speed > 0 else np.ceil(self.pos) - frac
+
     def __repr__(self):
         return f"Cursor(start={self.start}, height={self.height}, speed={self.speed}, pos={self.pos}, merge_direction={self.merge_direction})"
 
@@ -116,11 +119,7 @@ class Effector:
 
 
 def reverse(state, cursor, _):
-    gap = cursor.get_frac_pos()
-    if cursor.speed > 0:
-        cursor.pos = np.floor(cursor.pos) + (1 - gap)
-    else:
-        cursor.pos = np.ceil(cursor.pos) - (1 - gap)
+    cursor.set_frac_pos(1 - cursor.get_frac_pos())
     cursor.speed *= -1
 
 
@@ -165,12 +164,14 @@ def warp(state, cursor, pos):
 def speedup(state, cursor, pos):
     if abs(cursor.speed) < 16:
         cursor.speed *= 2
+        cursor.set_frac_pos(cursor.get_frac_pos() * 2)
     state.grid[pos] = 0  # self-destruct
 
 
 def slowdown(state, cursor, pos):
     if abs(cursor.speed) > 0.5:
         cursor.speed /= 2
+        cursor.set_frac_pos(cursor.get_frac_pos() / 2)
     state.grid[pos] = 0  # self-destruct
 
 
