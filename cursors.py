@@ -96,16 +96,22 @@ class GameState:
             hits = self.grid[
                 cursor.start : cursor.start + cursor.height, new_pos
             ].nonzero()[0]
-            hits = [((cursor.start + hit, new_pos), effectors[self.grid[cursor.start + hit, new_pos] - 1]) for hit in hits]
-            hits.sort(key=lambda p: p[1].order)
-            for pos, effector in hits:
+            effector_hits = {}
+            for hit in hits:
+                pos = (cursor.start + hit, new_pos)
                 if pos in visited:
-                    # Already used this effector on an earlier cursor (pre-split)
                     continue
                 visited.add(pos)
+                effector = effectors[self.grid[cursor.start + hit, new_pos] - 1]
                 print(f"we hit {effector.name} at {pos}!")
                 events.append([effector.name, *pos, cursor.height, cursor.speed, time_offset])
-                enqueued = effector.function(self, cursor, pos)
+                effector_hits[effector] = effector_hits.get(effector, []) + [pos]
+
+            # hits = [((cursor.start + hit, new_pos), effectors[self.grid[cursor.start + hit, new_pos] - 1]) for hit in hits]
+            for effector, positions in sorted(effector_hits.items(), key=lambda p: p[0].order):
+                # Each effector is called just once, with a list of all of the places where the cursor hit it.
+                # This allows us to do things like treat N reverses as a single reverse (instead of having them cancel each other out).
+                enqueued = effector.function(self, cursor, positions)
                 if enqueued is not None:
                     # Effector manipulated the queue; stop processing this cursor.
                     queue += enqueued
@@ -124,60 +130,65 @@ class Effector:
 
 
 def reverse(state, cursor, _):
-    cursor.set_frac_pos(1 - cursor.get_frac_pos())
+    frac = cursor.get_frac_pos()
     cursor.speed *= -1
+    cursor.set_frac_pos(frac)
 
 
-def split(state, cursor, pos):
-    if pos[0] == cursor.start:
-        return  # can't split at the top. (think about it)
+def split(state, cursor, positions):
     ind = state.cursors.index(cursor)
-    top = Cursor(cursor.start, pos[0] - cursor.start, cursor.speed, cursor.pos, 1)
-    bottom = Cursor(pos[0], cursor.start + cursor.height - pos[0], cursor.speed, cursor.pos, -1)
-    state.cursors[ind] = top
-    state.cursors.insert(ind + 1, bottom)
+    del state.cursors[ind]
+    rows = [p[0] for p in positions]
+    children = []
+    for start, end in zip([cursor.start] + rows, rows + [cursor.start + cursor.height]):
+        if start == end:
+            continue  # split of size 0 (e.g. if the effector is at the top of the cursor)
+        merge_direction = 1 if end < cursor.start + cursor.height else -1
+        child = Cursor(start, end - start, cursor.speed, cursor.pos, merge_direction)
+        children.append(child)
+    state.cursors[ind:ind] = children
     # Add children to queue.
-    return [top, bottom]
+    return children
 
 
 def merge(state, cursor, _):
+    # Note that the position (and number) of merge effectors here is irrelevant.
     ind = state.cursors.index(cursor)
     if ind > 0 and (cursor.merge_direction < 0 or ind == len(state.cursors) - 1):
         # Merge upwards
         state.cursors[ind - 1].height += cursor.height
         del state.cursors[ind]
-        # Re-process parent in case it should hit any other merge effectors with its new height.
-        # return [state.cursors[ind - 1]]
         return []
     elif ind < len(state.cursors) - 1 and (cursor.merge_direction > 0 or ind == 0):
         # Merge downwards
         state.cursors[ind + 1].start = cursor.start
         state.cursors[ind + 1].height += cursor.height
         del state.cursors[ind]
-        # Re-process parent in case it should hit any other merge effectors with its new height.
-        # return [state.cursors[ind]]
         return []
 
 
-def warp(state, cursor, pos):
+def warp(state, cursor, positions):
+    # If we hit multiple warps, row is irrelevant, and all positions have the same column.
     warps = state.get_warps(cursor.start, cursor.start + cursor.height)
     dir = 1 if cursor.speed > 0 else -1
     # Add difference (rather than setting directly) to preserve fractional position:
-    cursor.pos += warps[(warps.index(pos[1]) + dir) % len(warps)] - pos[1]
+    cursor.pos += warps[(warps.index(positions[0][1]) + dir) % len(warps)] - positions[0][1]
 
 
-def speedup(state, cursor, pos):
-    if abs(cursor.speed) < 16:
-        cursor.speed *= 2
-        cursor.set_frac_pos(cursor.get_frac_pos() * 2)
+def speedup(state, cursor, positions):
+    factor = 2**len(positions)
+    if abs(cursor.speed) <= 16 / factor:
+        cursor.speed *= factor
+        cursor.set_frac_pos(cursor.get_frac_pos() * factor)
     state.grid[pos] = 0  # self-destruct
 
 
-def slowdown(state, cursor, pos):
-    if abs(cursor.speed) > 0.5:
-        cursor.speed /= 2
-        cursor.set_frac_pos(cursor.get_frac_pos() / 2)
-    state.grid[pos] = 0  # self-destruct
+def slowdown(state, cursor, positions):
+    factor = 2**len(positions)
+    if abs(cursor.speed) >= 0.5 * factor:
+        cursor.speed /= factor
+        cursor.set_frac_pos(cursor.get_frac_pos() / factor)
+    state.grid[positions] = 0  # self-destruct
 
 
 def trigger(*_):
