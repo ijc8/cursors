@@ -84,7 +84,7 @@ class CursorClient:
             t = time.time()
             # Interpolate cursor positions between updates
             for cursor in self.mirror_state.cursors:
-                cursor.pos = (cursor.recv_pos + cursor.speed * (t - self.client_timestamp)) % self.mirror_state.grid.shape[1]
+                cursor.pos = (cursor.recv_pos + cursor.speed * (t - self.client_timestamp + self.packet_jitter_buffer)) % self.mirror_state.grid.shape[1]
 
         self.next_frame = render(self.mirror_state, self.modifiers, self.player_id * 8)
         r = np.where(self.next_frame != self.frame)
