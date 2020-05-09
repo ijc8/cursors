@@ -78,6 +78,11 @@ def run():
     fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
     plt.tight_layout()
     running = True
+    hole_radius = 3
+    # r = (np.arange(state.grid.shape[0] + 1) + hole_radius)[::-1]
+    lo = 4
+    r = (np.geomspace(lo, state.grid.shape[0] + lo, num=state.grid.shape[0] + 1) - lo + hole_radius)[::-1]
+    print('rs', r - hole_radius)
 
     def on_close(event):
         nonlocal running
@@ -87,9 +92,9 @@ def run():
     def on_click(event):
         if event.xdata is None or event.ydata is None:
             return
-        x = int(round(event.xdata))
-        y = int(round(event.ydata))
-        state.grid[y, x] = cursors.effectors.index(selected_effector) + 1
+        col = int(np.floor(-event.xdata / (2*np.pi) * state.grid.shape[1]))
+        row = np.where(r > event.ydata)[0][-1]
+        state.grid[row, col] = cursors.effectors.index(selected_effector) + 1
 
     keymap = {
         "n": cursors.effectors[0],
@@ -132,10 +137,6 @@ def run():
         left=False,
         labelleft=False,
     )
-    hole_radius = 3
-    # r = (np.arange(state.grid.shape[0] + 1) + hole_radius)[::-1]
-    lo = 4
-    r = (np.geomspace(lo, state.grid.shape[0] + lo, num=state.grid.shape[0] + 1) - lo + hole_radius)[::-1]
     theta = np.linspace(0, 2*np.pi, state.grid.shape[1] + 1)
 
     image = plt_render(state)[:, ::-1, :]
@@ -153,7 +154,7 @@ def run():
     ax.vlines(theta, hole_radius, r[0], color=bgcolor, linewidth=3)
     # Also, show divisions between squares:
     ax.vlines(theta[::8], hole_radius, r[0], color='black', linewidth=5)
-    ax.set_rticks(r - 0.01, minor=True)
+    ax.set_rticks(r, minor=True)
     ax.tick_params(which="minor", bottom=False, left=False)
     ax.grid(which="minor", color=bgcolor, linestyle="-", linewidth=3)
     for edge, spine in ax.spines.items():
@@ -206,6 +207,11 @@ def run():
 
     t = threading.Thread(target=update_state)
     t.start()
+
+    legend_lines = [matplotlib.lines.Line2D([0], [0], color=effector.rgb_color, lw=8) for effector in cursors.effectors]
+    legend_names = [effector.name for effector in cursors.effectors]
+    legend = fig.legend(legend_lines, legend_names, loc='upper left', frameon=False)
+    plt.setp(legend.get_texts(), color='w')
 
     plt.show(block=True)
     running = False
