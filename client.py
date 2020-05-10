@@ -59,6 +59,9 @@ class CursorClient:
         self.server_timestamp = None
         # TODO: decrease max frac_pos/time_offset on server side, and lower this.
         self.packet_jitter_buffer = 0.25  # 250 ms
+        # Queue of incoming cursor changes, as list of (timestamp, [cursors]).
+        self.cursor_updates = []
+        self.cursor_timestamp = 0
 
     def open(self, host):
         self.lp.open()
@@ -71,6 +74,7 @@ class CursorClient:
             exit('Server full.')
         print(f'You are player {self.player_id}.')
         self.mirror_state = cursors.GameState(num_players)
+        self.mirror_state.cursors[0].recv_pos = 0  # hack
 
         self.sockf = self.socket.makefile('r')
         self.client = OSCClient('127.0.0.1', 8000)
@@ -82,9 +86,17 @@ class CursorClient:
     def update_frame(self):
         if self.client_timestamp is not None:
             t = time.time()
+            # Update to "current" set of cursors.
+            updated = False
+            while self.cursor_updates and t > self.cursor_updates[0][0]:
+                self.cursor_timestamp, self.mirror_state.cursors = self.cursor_updates.pop(0)
+                updated = True
+            if updated:
+                for cursor in self.mirror_state.cursors:
+                    cursor.recv_pos = cursor.pos
             # Interpolate cursor positions between updates
             for cursor in self.mirror_state.cursors:
-                cursor.pos = (cursor.recv_pos + cursor.speed * (t - self.client_timestamp + self.packet_jitter_buffer)) % self.mirror_state.grid.shape[1]
+                cursor.pos = (cursor.recv_pos + cursor.speed * (t - self.cursor_timestamp)) % self.mirror_state.grid.shape[1]
 
         self.next_frame = render(self.mirror_state, self.modifiers, self.player_id * 8)
         r = np.where(self.next_frame != self.frame)
@@ -126,7 +138,6 @@ class CursorClient:
             if self.server_timestamp is None:
                 self.client_timestamp = now + self.packet_jitter_buffer
                 self.server_timestamp = timestamp
-            old = self.client_timestamp
             self.client_timestamp += timestamp - self.server_timestamp
             self.server_timestamp = timestamp
             # print('server', timestamp, self.server_timestamp, timestamp - self.server_timestamp)
@@ -136,11 +147,7 @@ class CursorClient:
                 print(f'late by {-delay}. jitter exceeded {self.packet_jitter_buffer} seconds')
                 delay = 0
 
-            self.mirror_state.cursors = [
-                cursors.Cursor(*d) for d in data['cursors']]
-            # Kind of a hack:
-            for cursor in self.mirror_state.cursors:
-                cursor.recv_pos = cursor.pos
+            self.cursor_updates.append((self.client_timestamp, [cursors.Cursor(*d) for d in data['cursors']]))
             if 'grid' in data:
                 self.mirror_state.grid = np.zeros(
                     self.mirror_state.grid.shape, dtype=np.int)
