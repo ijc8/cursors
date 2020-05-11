@@ -6,8 +6,6 @@ import sys
 import cursors
 import json
 import time
-from oscpy.client import OSCClient
-
 
 def encode_bytes(window, pos, effector):
     first = window | (pos[0] << 5)
@@ -77,7 +75,6 @@ class CursorClient:
         self.mirror_state.cursors[0].recv_pos = 0  # hack
 
         self.sockf = self.socket.makefile('r')
-        self.client = OSCClient('127.0.0.1', 8000)
 
     def close(self):
         self.lp.reset()
@@ -153,14 +150,6 @@ class CursorClient:
                     self.mirror_state.grid.shape, dtype=np.int)
                 for x, y, value in data.get('grid', []):
                     self.mirror_state.grid[x, y] = value
-            for event in data.get('events', []):
-                print(f'Event: {event}')
-                event[0] = event[0].encode('utf8')
-                # Fractional event timing offset + jitter-prevention delay = Patch triggering delay
-                # TODO: consider using this for lp display as well, to smooth frac_pos/dt-related jitter.
-                event[-1] += delay
-                self.client.send_message(b'/cursors', event)
-                print(event)
 
     def run(self):
         while True:

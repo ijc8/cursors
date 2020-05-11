@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.animation
 import matplotlib.pyplot as plt
+from oscpy.client import OSCClient
 
 import cursors
 
@@ -51,15 +52,17 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
 
+def np_convert(obj):
+    if type(obj).__module__ == np.__name__:
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return obj.item()
+    return obj
+
 # https://stackoverflow.com/questions/26646362/numpy-array-is-not-json-serializable
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
-        if type(obj).__module__ == np.__name__:
-            if isinstance(obj, np.ndarray):
-                return obj.tolist()
-            else:
-                return obj.item()
-        return json.JSONEncoder.default(self, obj)
+        return np_convert(obj)
 
 
 def decode_bytes(b):
@@ -71,6 +74,10 @@ def decode_bytes(b):
 
 
 def run():
+    osc_client = OSCClient('127.0.0.1', 8000)
+    state_framerate = 60
+    graphics_framerate = 30
+
     ### PLT stuff ###
     selected_effector = cursors.effectors[0]
 
@@ -171,7 +178,7 @@ def run():
                            [-c.pos / state.grid.shape[1] * 2 * np.pi, 8 - (c.start + c.height) + hole_radius]] for c in state.cursors])
         lc.set_segments(lines)
 
-    ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/30)
+    ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/graphics_framerate)
     ### END PLT STUFF
 
     def update_state():
@@ -191,8 +198,12 @@ def run():
                 data["grid"] = grid_info
                 last_grid_info = grid_info
             if events:
-                data["events"] = events
-            if data:
+                for event in events:
+                    event[0] = event[0].encode('utf8')
+                    event[1:] = map(np_convert, event[1:])
+                    event[-1] += 1/state_framerate
+                    osc_client.send_message(b'/cursors', event)
+            if data or events:
                 # Only send cursor updates if something else of interest has occurred.
                 # Assumes the client will interpolate motion based on cursor speed in the meantime.
                 data["cursors"] = [c.dump() for c in state.cursors]
@@ -203,7 +214,7 @@ def run():
                         sock.send(bytes(data + "\n", "utf8"))
                     except OSError:
                         pass
-            time.sleep(1/60)
+            time.sleep(1/state_framerate)
 
     t = threading.Thread(target=update_state)
     t.start()
