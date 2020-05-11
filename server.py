@@ -28,6 +28,10 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         if len(clients) >= state.num_squares:
             print(f"no room, closing connection")
             return
+        nickname_len = self.request.recv(1)[0]
+        nickname = self.request.recv(nickname_len).decode('utf8')
+        nicknames[player_id] = nickname
+        print('players', nicknames)
         clients.add((player_id, self.request))
         # Send the client initial state upon join, without first waiting for an event.
         now = time.time()
@@ -59,6 +63,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             pass
 
         clients.remove((player_id, self.request))
+        nicknames[player_id] = ''
         print(f"<- {self.client_address[0]} disconnected")
 
 
@@ -246,8 +251,10 @@ def run():
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         exit('usage: server.py <number of players>')
-    state = cursors.GameState(int(sys.argv[1]))
+    num_players = int(sys.argv[1])
+    state = cursors.GameState(num_players)
     clients = set()
+    nicknames = [''] * num_players
     with ThreadedTCPServer(("0.0.0.0", 8765), MyTCPHandler) as server:
         serve_thread = threading.Thread(target=server.serve_forever)
         serve_thread.start()

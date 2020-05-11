@@ -180,15 +180,19 @@ def speedup(state, cursor, positions):
     if abs(cursor.speed) <= 16 / factor:
         cursor.speed *= factor
         cursor.set_frac_pos(cursor.get_frac_pos() * factor)
-    state.grid[positions] = 0  # self-destruct
+    print(positions)
+    for p in positions: state.grid[p] = 0  # self-destruct
 
 
 def slowdown(state, cursor, positions):
     factor = 2**len(positions)
     if abs(cursor.speed) >= 0.5 * factor:
         cursor.speed /= factor
+        if cursor.pos % 2 > 1:
+            cursor.pos += 0.5
+            cursor.pos %= state.grid.shape[1]
         cursor.set_frac_pos(cursor.get_frac_pos() / factor)
-    state.grid[positions] = 0  # self-destruct
+    for p in positions: state.grid[p] = 0  # self-destruct
 
 
 def trigger(*_):
