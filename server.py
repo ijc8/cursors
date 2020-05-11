@@ -29,6 +29,21 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             print(f"no room, closing connection")
             return
         clients.add((player_id, self.request))
+        # Send the client initial state upon join, without first waiting for an event.
+        now = time.time()
+        points = np.array(state.grid.nonzero()).T
+        grid_info = []
+        for p in points:
+            grid_info.append([*p, state.grid[(*p,)]])
+        data = {}
+        data["grid"] = grid_info
+        data["cursors"] = [c.dump() for c in state.cursors]
+        data["timestamp"] = now
+        data = json.dumps(data, cls=NumpyEncoder)
+        try:
+            self.request.send(bytes(data + "\n", "utf8"))
+        except OSError:
+            pass
 
         try:
             while True:
