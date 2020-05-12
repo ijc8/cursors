@@ -189,14 +189,31 @@ def run():
 
     lc = ax.vlines([], [], [], color=state.cursors[0].rgb_color, lw=4)
 
+    nickname_texts = []
+    for i, name in enumerate(nicknames):
+        print(name)
+        angle = -(i + .5) / num_players * 2*np.pi
+        nickname_texts.append(ax.text(
+            angle, hole_radius + 8.5, name,
+            rotation=angle / np.pi * 180 - 90,
+            va='center', ha='center',
+            fontweight=10,
+            fontfamily='monospace',
+            fontsize=18,
+            color='gray'
+        ))
+
     def update_display(frame):
         image = plt_render(state)[:, ::-1, :]
         raveled_pixel_shape = (image.shape[0]*image.shape[1], image.shape[2])
         color_tuple = image.reshape(raveled_pixel_shape)
         im.set_color(color_tuple)
-        lines = np.array([[[-c.pos / state.grid.shape[1] * 2 * np.pi, 8 - c.start + hole_radius],
-                           [-c.pos / state.grid.shape[1] * 2 * np.pi, 8 - (c.start + c.height) + hole_radius]] for c in state.cursors])
+        lines = np.array([[[-c.pos / state.grid.shape[1] * 2 * np.pi, r[c.start]],
+                           [-c.pos / state.grid.shape[1] * 2 * np.pi, r[c.start + c.height]]] for c in state.cursors])
         lc.set_segments(lines)
+        for name, text in zip(nicknames, nickname_texts):
+            text.set_text(name)
+
 
     ani = matplotlib.animation.FuncAnimation(fig, update_display, interval=1000/graphics_framerate)
     ### END PLT STUFF
