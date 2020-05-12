@@ -188,10 +188,11 @@ def slowdown(state, cursor, positions):
     factor = 2**len(positions)
     if abs(cursor.speed) >= 0.5 * factor:
         cursor.speed /= factor
-        if cursor.pos % 2 > 1:
-            cursor.pos += 0.5
-            cursor.pos %= state.grid.shape[1]
         cursor.set_frac_pos(cursor.get_frac_pos() / factor)
+        for other in state.cursors:
+            if other is cursor: continue
+            if other.speed == cursor.speed:
+                cursor.set_frac_pos(other.get_frac_pos())
     for p in positions: state.grid[p] = 0  # self-destruct
 
 
