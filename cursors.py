@@ -26,7 +26,7 @@ class Cursor:
         self.pos = pos
         self.merge_direction = merge_direction
         self.color = [1, 1]
-        self.rgb_color = lp_to_rgb(self.color)
+        self.rgb_color = np.array([247, 229, 64]) / 255 # lp_to_rgb(self.color)
 
     def dump(self):
         return [self.start, self.height, self.speed, self.pos, self.merge_direction]

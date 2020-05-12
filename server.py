@@ -93,13 +93,26 @@ def decode_bytes(b):
     return (pos, effector)
 
 
+# TODO: avoid duplicating name/order
+keymap = {
+    "0": ("erase", 0),
+    "n": ("note", 1),
+    "r": ("reverse", 2),
+    "s": ("split", 3),
+    "m": ("merge", 4),
+    "w": ("warp", 5),
+    "u": ("speedup", 6),
+    "d": ("slowdown", 7),
+}
+
+
 def run():
     osc_client = OSCClient('127.0.0.1', 8000)
     state_framerate = 60
     graphics_framerate = 30
 
     ### PLT stuff ###
-    selected_effector = cursors.effectors[0]
+    selected_effector = keymap["n"]
 
     matplotlib.rcParams["toolbar"] = "None"
     fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
@@ -121,15 +134,7 @@ def run():
             return
         col = int(np.floor(-event.xdata / (2*np.pi) * state.grid.shape[1]))
         row = np.where(r > event.ydata)[0][-1]
-        state.grid[row, col] = cursors.effectors.index(selected_effector) + 1
-
-    keymap = {
-        "n": cursors.effectors[0],
-        "r": cursors.effectors[1],
-        "s": cursors.effectors[2],
-        "m": cursors.effectors[3],
-        "w": cursors.effectors[4],
-    }
+        state.grid[row, col] = selected_effector[1]
 
     def on_keypress(event):
         if event.key == "R":
@@ -140,7 +145,7 @@ def run():
             return
         nonlocal selected_effector
         selected_effector = keymap[event.key]
-        ax.set_xlabel(selected_effector.name)
+        ax.set_xlabel(selected_effector[0])
 
     fig.canvas.mpl_connect("close_event", on_close)
     fig.canvas.mpl_connect("button_press_event", on_click)
@@ -256,10 +261,10 @@ def run():
     t = threading.Thread(target=update_state)
     t.start()
 
-    legend_lines = [matplotlib.lines.Line2D([0], [0], color=effector.rgb_color, lw=8) for effector in cursors.effectors]
-    legend_names = [effector.name for effector in cursors.effectors]
-    legend = fig.legend(legend_lines, legend_names, loc='upper left', frameon=False)
-    plt.setp(legend.get_texts(), color='w')
+    # legend_lines = [matplotlib.lines.Line2D([0], [0], color=effector.rgb_color, lw=8) for effector in cursors.effectors]
+    # legend_names = [effector.name for effector in cursors.effectors]
+    # legend = fig.legend(legend_lines, legend_names, loc='upper left', frameon=False)
+    # plt.setp(legend.get_texts(), color='w')
 
     plt.show(block=True)
     running = False
