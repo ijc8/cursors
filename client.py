@@ -143,9 +143,7 @@ class CursorClient:
                 self.server_timestamp = timestamp
             self.client_timestamp += timestamp - self.server_timestamp
             self.server_timestamp = timestamp
-            # print('server', timestamp, self.server_timestamp, timestamp - self.server_timestamp)
             delay = self.client_timestamp - now
-            # print('client', old, self.client_timestamp, now, delay)
             if delay < 0:
                 print(f'late by {-delay}. jitter exceeded {self.packet_jitter_buffer} seconds')
                 delay = 0
